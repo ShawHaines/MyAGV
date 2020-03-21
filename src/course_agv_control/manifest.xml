@@ -1,0 +1,12 @@
+<package>
+  <description brief="course_agv_control">
+
+     course_agv_control
+
+  </description>
+  <author>shaw</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/course_agv_control</url>
+
+</package>
