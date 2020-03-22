@@ -3,7 +3,7 @@
 <robot name="course_agv" 
     xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <xacro:property name="PI" value="3.1415926535897932"/>
+    <xacro:property name="PI" value="3.1415926535897931"/>
     <xacro:property name="mass" value="5" />
     <xacro:property name="length" value="0.4" />
     <xacro:property name="width" value="0.2" />
@@ -33,20 +33,6 @@
         <origin rpy="0 ${PI/2.0} ${PI/2.0}" xyz="0.0 ${-(width / 2.0 + wheel_thickness / 2.0)}  ${wheel_radius}"/>
         <axis xyz="9.00000000e-05   9.00000000e-05   1.00000000e+00"/>
         <limit effort="100" lower="0" upper="0" velocity="5"/>
-    </joint>
-        <joint name="course_agv__hokuyo_joint" type="fixed">
-        <parent link="robot_base"/>
-        <child link="course_agv__hokuyo__link"/>
-        <origin rpy="0  0  0" xyz="0.0 0.0 ${height+chassis_height+0.0495}"/>
-        <axis xyz="0  0  0"/>
-        <limit effort="0" lower="0" upper="0" velocity="0"/>
-    </joint>
-    <joint name="course_agv__imu_joint" type="fixed">
-        <parent link="robot_base"/>
-        <child link="course_agv__imu"/>
-        <origin rpy="0  0  0" xyz="0.0 0.0 ${height/2+chassis_height}"/>
-        <axis xyz="0  0  0"/>
-        <limit effort="0" lower="0" upper="0" velocity="0"/>
     </joint>
     <joint name="course_agv__chassis_joint" type="fixed">
         <parent link="robot_base" />
@@ -144,53 +130,6 @@
             </geometry>
             <material name="grey" />
         </visual>
-    </link>
-    <!-- hokuyo laser -->
-    <link name="course_agv__hokuyo__link">
-        <inertial>
-            <mass value="1e-5"/>
-            <origin rpy="0 0 0" xyz="0 0 0"/>
-            <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
-        </inertial>
-        <collision name="course_agv__hokuyo__collision-base">
-            <origin rpy="0 0 0" xyz="0 0 -0.035"/>
-            <geometry>
-                <box size="0.05 0.05 0.041"/>
-            </geometry>
-        </collision>
-        <collision name="course_agv__hokuyo__collision-top">
-            <origin rpy="0 0 0" xyz="0 0 0"/>
-            <geometry>
-                <cylinder length="0.029" radius="0.021"/>
-            </geometry>
-        </collision>
-        <visual>
-            <origin rpy="0  0  0" xyz="0  0 -0.0205"/>
-            <geometry>
-                <mesh filename="package://course_agv_description/meshes/hokuyo.dae" scale="1.0 1.0 1.0"/>
-            </geometry>
-        </visual>
-    </link>
-    <!-- imu -->
-    <link name="course_agv__imu">
-        <collision>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-            <geometry>
-                <box size="0.02 0.02 0.01"/>
-            </geometry>
-        </collision>
-        <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-            <geometry>
-                <box size="0.02 0.02 0.01"/>
-            </geometry>
-            <material name="red"/>
-        </visual>
-        <inertial>
-            <mass value="0.001" />
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-            <inertia ixx="0.00000015" ixy="0" ixz="0" iyy="0.00000015" iyz="0" izz="0.00000015" />
-        </inertial>
     </link>
 
     <transmission name="tran_left_wheel">
