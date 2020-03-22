@@ -1,0 +1,12 @@
+<package>
+  <description brief="course_agv_nav">
+
+     course_agv_nav
+
+  </description>
+  <author>shaw</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/course_agv_nav</url>
+
+</package>
