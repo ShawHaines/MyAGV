@@ -3,7 +3,7 @@
 >  目标：使用urdf在gazebo中构建双轮差动机器人，使其正确显示并通过ros node可以控制轮子速度
 
 ```bash
-apt-get install ros-kinetic-joint-state-publisher-gui ros-kinetic-joint-state-controller ros-kinetic-controller-manager ros-kinetic-gazebo-ros-pkgs ros-kinetic-gazebo-ros-control 
+apt-get install ros-melodic-joint-state-publisher-gui ros-melodic-joint-state-controller ros-melodic-controller-manager ros-melodic-gazebo-ros-pkgs ros-melodic-gazebo-ros-control 
 ```
 
 本节推荐package以及细节文件结构请参考task/c2

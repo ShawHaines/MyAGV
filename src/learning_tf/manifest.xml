@@ -1,0 +1,18 @@
+<package>
+  <description brief="learningTF">
+
+     learningTF
+
+  </description>
+  <author>shaw</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/learningTF</url>
+  <depend package="tf"/>
+  <depend package="roscpp"/>
+  <depend package="rospy"/>
+  <depend package="turtlesim"/>
+
+</package>
+
+

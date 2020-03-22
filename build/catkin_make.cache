@@ -1,2 +1,2 @@
-
+beginner_tutorials:course_agv_control:course_agv_description:course_agv_gazebo
 -DCATKIN_DEVEL_PREFIX=/home/shaw/catkin_ws/devel -DCMAKE_INSTALL_PREFIX=/home/shaw/catkin_ws/install -G Unix Makefiles
