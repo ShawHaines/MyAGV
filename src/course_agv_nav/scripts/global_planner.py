@@ -5,6 +5,7 @@ import tf
 from nav_msgs.srv import GetMap
 from nav_msgs.msg import Path,OccupancyGrid
 from geometry_msgs.msg import PoseStamped,Point,PointStamped
+from std_msgs.msg import Header
 # from course_agv_nav.srv import Plan,PlanResponse
 
 # import matplotlib as mpl
@@ -13,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 # import cv2
 import time
+import heapq
 
 def dilate(src, kernel):
     """
@@ -42,9 +44,16 @@ def dilate(src, kernel):
             result[i,j]=np.max(tempMap[i:i+kernel.shape[0],j:j+kernel.shape[1]]&kernel)
     return result
 
+class MyPoint:
+    def __init__(self,x=0,y=0):
+        self.x=int(x)
+        self.y=int(y)
+        return
+
 class GlobalPlanner:
     pathPublisher=None
-    currentPoint=None
+    currentPose=None
+    goal=None
     goalSubscriber=None
     tfListener=None
     mapGrid=[]
@@ -76,25 +85,35 @@ class GlobalPlanner:
         self.goalSubscriber=rospy.Subscriber('/course_agv/goal',PoseStamped,callback=self.onUpdateGoal)
         return
                 
-# def AStarSearch(self,now,destination)：
-    #     pass
-
     def onUpdateGoal(self,goal):
-        destination = self.tfListener.transformPose("map", goal)
-        rospy.loginfo(destination.pose.position)
+        self.goal = self.tfListener.transformPose("map", goal)
+        # rospy.loginfo(self.goal.pose.position)
+        self.currentPose = PoseStamped()
         
-        self.currentPoint = PointStamped()
-        self.currentPoint.header.__init__(seq=1,stamp=rospy.Time.now(),frame_id="robot_base")
-        self.currentPoint.point=Point(0,0,0)
-        # currentPose.pose.orientation=tf.transformations.quaternion_from_euler(0,0,1)
-        rospy.loginfo(self.currentPoint.point)
+        # subtract a duration of 0.03 second to ensure the transform.
+        self.currentPose.header.__init__(seq=1,stamp=rospy.Time.now()-rospy.Duration(secs=0.03),frame_id="robot_base")
+        self.currentPose.pose.position=Point(0,0,0)
+        self.currentPose.pose.orientation=tf.transformations.quaternion_from_euler(0,0,1)
+        # rospy.loginfo(self.currentPoint)
+        self.currentPose = self.tfListener.transformPoint('map',self.currentPose)
+        # rospy.loginfo(self.currentPoint.point)
 
-        self.currentPoint = self.tfListener.transformPoint('map',self.currentPoint)
-        rospy.loginfo(self.currentPoint.point)
-
-        # AStarSearch(now,destination)
+        # transform into the nearest grid, default origin is on the center.
+        now=MyPoint()
+        destination=MyPoint()
+        now.x = self.currentPose.pose.position.x//self.mapInfo.resolution+self.mapInfo.width//2
+        now.y = self.currentPose.pose.position.y//self.mapInfo.resolution+self.mapInfo.height//2
+        destination.x=self.goal.pose.position.x//self.mapInfo.resolution+self.mapInfo.width //2
+        destination.y=self.goal.pose.position.y//self.mapInfo.resolution+self.mapInfo.height//2
         
-                
+        rospy.loginfo((now.x,now.y))
+        rospy.loginfo((destination.x,destination.y))
+        
+        self.AStarSearch(now,destination)
+        
+    def AStarSearch(self,now,destination):
+        if now.x==destination.x and now.y==destination.y:
+            self.path
 
     def __init__(self):
         # TODO :
