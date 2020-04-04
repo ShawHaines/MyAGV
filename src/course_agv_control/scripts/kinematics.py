@@ -19,14 +19,18 @@ class Transmitter:
         # rospy.loginfo(rospy.get_caller_id())
         velocity=data.linear.x
         omega=data.angular.z
-        rospy.loginfo("  v={:3} w={:3}".format(velocity,omega))
+
+        # rospy.loginfo("  v={:3} w={:3}".format(velocity,omega))
+        # change to print message, in order to save some logging space.
+        print("v={:3} w={:3}".format(velocity,omega))
 
 
         # first I'll guess the velocity command is for v...
         self.__leftVelocity=(velocity-omega*Width/2)
         self.__rightVelocity=(velocity+omega*Width/2)
         
-        rospy.loginfo(" Vr={:3} Vl={:3}".format(self.__rightVelocity,self.__leftVelocity))
+        # rospy.loginfo(" Vr={:3} Vl={:3}".format(self.__rightVelocity,self.__leftVelocity))
+        print("\tVr={:3} Vl={:3}".format(self.__rightVelocity,self.__leftVelocity))
 
         self.rightPublisher.publish(self.__rightVelocity)
         self.leftPublisher.publish(self.__leftVelocity)
