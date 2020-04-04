@@ -71,6 +71,9 @@ class GlobalPlanner:
     path=None
     # order: counter-clockwise, from x axis
     def loadMap(self,data):
+        # load only once.
+        if self.mapGrid:
+            return
         ExpandRadius=0.4
 
         self.mapGrid=[0 if x==0 else 1 for x in data.data]
@@ -79,8 +82,10 @@ class GlobalPlanner:
         self.mapGrid=np.reshape(self.mapGrid,
                                 (self.mapInfo.height,self.mapInfo.width))
         
+        # plt can only work in main thread...
         # print(self.mapGrid)
         # plt.pcolormesh(self.mapGrid)
+        # plt.show()
         # plt.savefig("mapGrid_src.png")
 
         cellCount=ExpandRadius*2//self.mapInfo.resolution+1
@@ -89,7 +94,8 @@ class GlobalPlanner:
 
         # plt.pcolormesh(self.mapGrid)
         # plt.savefig("expanded.png")
-        # print("finished.")
+        # plt.show()
+        print("finished.")
         # useless openCV!
         # self.mapGrid=cv2.dilate(self.mapGrid,kernel)
         # cv2.imshow('result',self.mapGrid)
@@ -175,7 +181,9 @@ class GlobalPlanner:
             for i in range(len(tempPath)):
                 self.path.poses[i].header.seq=i
                 if i<len(tempPath)-1:
-                    # calculate the inner product to find theta
+                    # calculate the inner product to find theta，
+                    # it's really a clever way, instead of the diverging problem of arctan 
+                    # and +- sign problem.
                     deltaR=np.array([self.path.poses[i+1].pose.position.x-self.path.poses[i].pose.position.x, self.path.poses[i+1].pose.position.y-self.path.poses[i].pose.position.y])
 
                     # rospy.loginfo(self.path.poses[i])
@@ -244,6 +252,8 @@ def main():
     rospy.init_node('global_planner',anonymous=False)
     gp = GlobalPlanner()
     time.sleep(0.5)
+    # plt.pcolormesh(gp.mapGrid)
+    # plt.show()
     # gp.test()
     rospy.spin()
     pass
