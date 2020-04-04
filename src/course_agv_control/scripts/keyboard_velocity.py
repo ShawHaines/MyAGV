@@ -7,9 +7,9 @@ import geometry_msgs.msg
 command = {
     "vx":0.0,
     "vw":0.0,
-    "step":0.1,
+    "step":0.01,
     "vmax":3.0,
-    "wmax":10.0
+    "wmax":3.0
 }
 def limitNum(num,minNum,maxNum):
     if num > maxNum:

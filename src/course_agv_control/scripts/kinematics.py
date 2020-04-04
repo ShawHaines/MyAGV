@@ -26,11 +26,11 @@ class Transmitter:
 
 
         # first I'll guess the velocity command is for v...
-        self.__leftVelocity=(velocity-omega*Width/2)
-        self.__rightVelocity=(velocity+omega*Width/2)
+        self.__leftVelocity=(velocity-omega*Width/2)/WheelRadius
+        self.__rightVelocity=(velocity+omega*Width/2)/WheelRadius
         
         # rospy.loginfo(" Vr={:3} Vl={:3}".format(self.__rightVelocity,self.__leftVelocity))
-        print("\tVr={:3} Vl={:3}".format(self.__rightVelocity,self.__leftVelocity))
+        print("\tWr={:3} Wl={:3}".format(self.__rightVelocity,self.__leftVelocity))
 
         self.rightPublisher.publish(self.__rightVelocity)
         self.leftPublisher.publish(self.__leftVelocity)

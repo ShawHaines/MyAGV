@@ -78,7 +78,7 @@ class Tracking:
 
         target_angle = math.atan2(dy, dx)
 
-        self.vx = 0.2
+        self.vx = 0.05
         self.vw = (target_angle-self.yaw)/1.0
         # this threshold would only add to the instability. The angular velocity is not too sensitive.
         # if self.vw > 0.5:
