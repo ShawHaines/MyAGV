@@ -83,7 +83,8 @@ class Tracking:
         # this threshold would only add to the instability. The angular velocity is not too sensitive.
         # if self.vw > 0.5:
         #     self.vw = 0.5
-        if self.vw > 0.2 :
+        # the limit should be 2 ways.
+        if self.vw > 0.2 or self.vw<-0.2:
             self.vx = 0
 
         self.publishVel()
