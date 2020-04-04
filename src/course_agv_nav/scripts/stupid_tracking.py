@@ -26,6 +26,7 @@ class Tracking:
         try:
             self.tf.waitForTransform("/map", "/robot_base", rospy.Time(), rospy.Duration(4.0))
             (self.trans,self.rot) = self.tf.lookupTransform('/map','/robot_base',rospy.Time(0))
+            
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             print("get tf error!")
         euler = tf.transformations.euler_from_quaternion(self.rot)
@@ -33,7 +34,6 @@ class Tracking:
         self.x = self.trans[0]
         self.y = self.trans[1]
         self.yaw = yaw
-
         p = self.path.poses[self.goal_index].pose.position
         dis = math.hypot(p.x-self.x,p.y-self.y)
         if dis < self.arrive_threshold and self.goal_index < len(self.path.poses)-1:
@@ -80,8 +80,9 @@ class Tracking:
 
         self.vx = 0.2
         self.vw = (target_angle-self.yaw)/1.0
-        if self.vw > 0.5:
-            self.vw = 0.5
+        # this threshold would only add to the instability. The angular velocity is not too sensitive.
+        # if self.vw > 0.5:
+        #     self.vw = 0.5
         if self.vw > 0.2 :
             self.vx = 0
 
