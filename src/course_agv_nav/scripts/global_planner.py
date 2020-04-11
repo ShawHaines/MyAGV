@@ -70,12 +70,20 @@ class GlobalPlanner:
     cells=[]
     path=None
     # order: counter-clockwise, from x axis
-    def loadMap(self,data):
-        # load only once.
-        if self.mapGrid:
-            return
-        ExpandRadius=0.4
+    def loadMap(self):
 
+        ExpandRadius=0.4
+        rospy.wait_for_service('/static_map')        
+        try:
+            # very compact use, equal to the effect of the commented ones.
+            data=rospy.ServiceProxy("/static_map",GetMap)().map
+            # getMapHandle=rospy.ServiceProxy("/static_map",GetMap)
+            # data=getMapHandle().map
+            
+        except rospy.ServiceException,e:
+            rospy.loginfo("Map service call failed: {}".format(e))
+
+        # print(data)
         self.mapGrid=[0 if x==0 else 1 for x in data.data]
         # print(self.mapGrid)
         self.mapInfo=data.info
@@ -223,7 +231,7 @@ class GlobalPlanner:
         
         self.pathPublisher = rospy.Publisher('/course_agv/global_path',Path,queue_size = 1)
         self.tfListener=tf.TransformListener() # plenty usage guides
-        self.mapSubscriber=rospy.Subscriber('/map',OccupancyGrid,callback=self.loadMap,queue_size=1)
+        self.loadMap()
         self.path=Path(header=Header(0,rospy.Time.now(),"map"))
         pass
     def test(self):
