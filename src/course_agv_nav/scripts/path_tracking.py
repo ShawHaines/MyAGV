@@ -10,18 +10,20 @@ from threading import Lock,Thread
 import numpy as np
 import math
 import time
-class LinearTracking:
+class Tracking:
     tracking_thread=None
     goal_index=0
-    sleepTime=0.01
-    arrive_threshold = 0.6
+    sleepTime=1.0
+    arrive_threshold = 0.4
     vx = 0.0
     vw = 0.0
     # arguments of coefficients that need to be adjusted
-    # linear control strategy version.
-    k_rho=0.3 
-    k_alpha=1.5
-    k_beta=1.0
+    # graceful control strategy version.
+    k1=1.5
+    k2=2
+    vMax=0.3
+    mu=0.01
+    order=2  # the order of v selector
     
     def __init__(self):
         self.lock = Lock()
@@ -97,14 +99,12 @@ class LinearTracking:
         alpha= beta-self.yaw
         rho=np.linalg.norm([dx,dy])
 
-        self.vx = self.k_rho*rho
-        self.vw = self.k_alpha*alpha+self.k_beta*beta
-        # this threshold would only add to the instability. The angular velocity is not too sensitive.
-        # if self.vw > 0.5:
-        #     self.vw = 0.5
-        # the limit should be 2 ways.
-        # if self.vw > 0.2 or self.vw<-0.2:
-        #     self.vx = 0
+        kappa=-1/rho*(self.k2*(alpha+math.atan(self.k1*beta))+math.sin(alpha)*(1+self.k1/(1+(self.k1*beta)**2)))
+        print("kappa={}".format(kappa))
+        self.vx=self.vMax/(1+self.mu*abs(kappa)**self.order)
+        self.vw=self.vx*kappa
+        print("\tx",self.vx)
+        print("\tw",self.vw)
 
         self.publishVel()
 
@@ -121,7 +121,7 @@ class LinearTracking:
 
 def main():
     rospy.init_node('stupid_tracking')
-    t = LinearTracking()
+    t = Tracking()
     rospy.spin()
 
 if __name__ == '__main__':
