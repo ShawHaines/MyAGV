@@ -1,8 +1,0 @@
-prefix=/home/shaw/catkin_ws/devel
-
-Name: course_agv_description
-Description: Description of course_agv_description
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

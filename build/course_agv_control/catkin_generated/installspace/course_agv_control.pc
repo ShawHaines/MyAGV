@@ -1,8 +1,0 @@
-prefix=/home/shaw/catkin_ws/install
-
-Name: course_agv_control
-Description: Description of course_agv_control
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 
