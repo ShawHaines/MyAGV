@@ -38,8 +38,9 @@ def dilate(src, kernel):
     #     raise ValueError("kernel size must be odd and bigger than 1")
     # if (bin_image.max() != 1) or (bin_image.min() != 0):
     #     raise ValueError("input image's pixel value must be 0 or 1")
-    newShape=[x+y for x,y in zip(src.shape,kernel.shape)]
-    tempMap=np.zeros(shape=tuple(newShape),dtype=np.int8);
+    # newShape=[x+y for x,y in zip(src.shape,kernel.shape)]
+    newShape=np.add(src.shape,kernel.shape)
+    tempMap=np.zeros(shape=tuple(newShape),dtype=np.int8)
     tempMap[kernel.shape[0]//2:kernel.shape[0]//2+src.shape[0],
             kernel.shape[1]//2:kernel.shape[1]//2+src.shape[1]]=src
     result=np.zeros(shape=src.shape)
@@ -194,6 +195,9 @@ class GlobalPlanner:
                     # calculate the inner product to find theta，
                     # it's really a clever way, instead of the diverging problem of arctan 
                     # and +- sign problem.
+                    # Actually math.atan2 will take care of that...
+                    
+                    # you need to learn to use trListener.lookupTransform function
                     deltaR=np.array([self.path.poses[i+1].pose.position.x-self.path.poses[i].pose.position.x, self.path.poses[i+1].pose.position.y-self.path.poses[i].pose.position.y])
 
                     # rospy.loginfo(self.path.poses[i])
@@ -201,6 +205,7 @@ class GlobalPlanner:
                     # rospy.loginfo(deltaR)
 
                     theta=np.arccos((deltaR*np.array([1,0])).sum()/np.linalg.norm(deltaR))
+
                     if (deltaR[1]<0):
                         theta=-theta
                     
