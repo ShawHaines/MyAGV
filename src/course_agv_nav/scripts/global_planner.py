@@ -6,6 +6,7 @@ from nav_msgs.srv import GetMap
 from nav_msgs.msg import Path,OccupancyGrid
 from geometry_msgs.msg import PoseStamped,Point,PointStamped,Quaternion
 from std_msgs.msg import Header
+from course_agv_nav.srv import Plan,PlanResponse
 # from course_agv_nav.srv import Plan,PlanResponse
 
 # import matplotlib as mpl
@@ -16,6 +17,7 @@ import numpy as np
 import time
 import heapq
 
+# order: counter-clockwise, from x axis
 directions=np.array([(1,0),(1,1),(0,1),(-1,1),(-1,0),(-1,-1),(0,-1),(1,-1)],dtype=int)
 
 def dilate(src, kernel):
@@ -61,6 +63,7 @@ class cell:
 
 class GlobalPlanner:
     pathPublisher=None
+    globalPlannerService=None
     currentPose=None
     goal=None
     goalSubscriber=None
@@ -69,7 +72,26 @@ class GlobalPlanner:
     mapInfo=None
     cells=[]
     path=None
-    # order: counter-clockwise, from x axis
+
+    def __init__(self):
+        # TODO :
+        #   tf listener : 
+        #   publisher   : /course_agv/global_path
+        #   subscriber  : /course_agv/goal
+        #   service     : /course_agv/global_plan
+        #   initialize for other variable
+        
+        #example
+        
+        self.pathPublisher = rospy.Publisher('/course_agv/global_path',Path,queue_size = 1)
+        self.tfListener=tf.TransformListener() # plenty usage guides
+        self.loadMap()
+        self.globalPlannerService=rospy.Service("/course_agv/global_plan",Plan,self.updatePlan,buff_size=1)
+        self.goalSubscriber=rospy.Subscriber('/course_agv/goal',PoseStamped,callback=self.onUpdateGoal)
+        
+        self.path=Path(header=Header(0,rospy.Time.now(),"map"))
+        pass
+
     def loadMap(self):
 
         ExpandRadius=0.4
@@ -113,41 +135,21 @@ class GlobalPlanner:
                 self.cells.append(cell())
         self.cells=np.reshape(self.cells,(self.mapInfo.height,self.mapInfo.width))
 
-        # I can only write this in the callback function to ensure it's called after the map is loaded...
-        self.goalSubscriber=rospy.Subscriber('/course_agv/goal',PoseStamped,callback=self.onUpdateGoal)
         return
                 
     def onUpdateGoal(self,goal):
+        # update Goal
         self.goal = self.tfListener.transformPose("map", goal)
         # rospy.loginfo(self.goal.pose.position)
-        self.currentPose = PoseStamped()
-        
-        # subtract a duration of 0.03 second to ensure the transform.
-        self.currentPose.header.__init__(seq=1,stamp=rospy.Time.now()-rospy.Duration(secs=0.03),frame_id="robot_base")
-        self.currentPose.pose.position=Point(0,0,0)
-        # the quaternion is really messy...
-        quaternion=tf.transformations.quaternion_from_euler(0,0,1)
-        self.currentPose.pose.orientation=Quaternion(x=quaternion[0],y=quaternion[1],z=quaternion[2],w=quaternion[3])
-        rospy.loginfo(self.currentPose)
-        self.currentPose = self.tfListener.transformPose('map',self.currentPose)
-        # rospy.loginfo(self.currentPoint.point)
 
-        # transform into the nearest grid, default origin is on the center.
-        # be aware that (x,y) is in the opposite order of (i,j)
-        # and now, destination is in row-column order, just as self.mapGrid
-        now=[]
-        destination=[]
-        now.append(int(self.currentPose.pose.position.y//self.mapInfo.resolution+self.mapInfo.height//2))
-        now.append(int(self.currentPose.pose.position.x//self.mapInfo.resolution+self.mapInfo.width//2))
-        destination.append(int(self.goal.pose.position.y//self.mapInfo.resolution+self.mapInfo.height//2))
-        destination.append(int(self.goal.pose.position.x//self.mapInfo.resolution+self.mapInfo.width //2))
-        # really messy...
-        now=tuple(now)
-        destination=tuple(destination)
-        rospy.loginfo(now)
-        rospy.loginfo(destination)
-        
-        self.AStarSearch(now,destination)
+        # call for planning service
+        rospy.wait_for_service("/course_agv/global_plan")
+        try:
+            plannerService=rospy.ServiceProxy("/course_agv/global_plan",Plan)
+            flag=plannerService()
+            print(flag)
+        except rospy.ServiceException, e:
+            print("global Planning service failed: {}".format(e))
         
     def AStarSearch(self,now,destination):
         for i in range(self.mapInfo.width):
@@ -206,11 +208,50 @@ class GlobalPlanner:
                     quaternion=tf.transformations.quaternion_from_euler(0,0,theta)
                     self.path.poses[i].pose.orientation=Quaternion(x=quaternion[0],y=quaternion[1],z=quaternion[2],w=quaternion[3])
                 else:
-                    quaternion=tf.transformations.quaternion_from_euler(0,0,0)
-                    self.path.poses[i].pose.orientation=Quaternion(x=quaternion[0],y=quaternion[1],z=quaternion[2],w=quaternion[3])
+                    # deals with the goal point.
+                    self.path.poses[i].pose=self.goal.pose
+                    # quaternion=tf.transformations.quaternion_from_euler(0,0,0)
+                    # self.path.poses[i].pose.orientation=Quaternion(x=quaternion[0],y=quaternion[1],z=quaternion[2],w=quaternion[3])
             self.path.header.seq+=1
             self.path.header.stamp=rospy.Time.now()
+            # publish the path
             self.pathPublisher.publish(self.path)
+
+            return True
+        else:
+            return False
+
+    def updatePlan(self,request):
+        # returns True if success. else return false.
+        # Also, it publishes the plan to topic /course_agv/global_path        
+        self.currentPose = PoseStamped()
+        
+        # subtract a duration of 0.03 second to ensure the transform.
+        self.currentPose.header.__init__(seq=1,stamp=rospy.Time.now()-rospy.Duration(secs=0.03),frame_id="robot_base")
+        self.currentPose.pose.position=Point(0,0,0)
+        # the quaternion is really messy...
+        quaternion=tf.transformations.quaternion_from_euler(0,0,1)
+        self.currentPose.pose.orientation=Quaternion(x=quaternion[0],y=quaternion[1],z=quaternion[2],w=quaternion[3])
+        rospy.loginfo(self.currentPose)
+        self.currentPose = self.tfListener.transformPose('map',self.currentPose)
+        # rospy.loginfo(self.currentPoint.point)
+        
+        # transform into the nearest grid, default origin is on the center.
+        # be aware that (x,y) is in the opposite order of (i,j)
+        # and now, destination is in row-column order, just as self.mapGrid
+        now=[]
+        destination=[]
+        now.append(int(self.currentPose.pose.position.y//self.mapInfo.resolution+self.mapInfo.height//2))
+        now.append(int(self.currentPose.pose.position.x//self.mapInfo.resolution+self.mapInfo.width//2))
+        destination.append(int(self.goal.pose.position.y//self.mapInfo.resolution+self.mapInfo.height//2))
+        destination.append(int(self.goal.pose.position.x//self.mapInfo.resolution+self.mapInfo.width //2))
+        # really messy...
+        now=tuple(now)
+        destination=tuple(destination)
+        rospy.loginfo(now)
+        rospy.loginfo(destination)
+        
+        return self.AStarSearch(now,destination)
 
     def toPoseStamped(self,pos):
         newPose=PoseStamped(header=Header(0,rospy.Time.now(),"map"))
@@ -218,22 +259,6 @@ class GlobalPlanner:
         newPose.pose.position.x=(pos[1]-self.mapInfo.height//2)*self.mapInfo.resolution
         newPose.pose.position.y=(pos[0]-self.mapInfo.width //2)*self.mapInfo.resolution
         return newPose
-
-    def __init__(self):
-        # TODO :
-        #   tf listener : 
-        #   publisher   : /course_agv/global_path
-        #   subscriber  : /course_agv/goal
-        #   service     : /course_agv/global_plan
-        #   initialize for other variable
-        
-        #example
-        
-        self.pathPublisher = rospy.Publisher('/course_agv/global_path',Path,queue_size = 1)
-        self.tfListener=tf.TransformListener() # plenty usage guides
-        self.loadMap()
-        self.path=Path(header=Header(0,rospy.Time.now(),"map"))
-        pass
     def test(self):
         rx = [0,-1,-2,-3]
         ry = [0,1,0,1]
