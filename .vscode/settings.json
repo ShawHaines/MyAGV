@@ -1,3 +1,7 @@
 {
-    "python.pythonPath": "/home/shaw/miniconda3/envs/python27/bin/python"
+    "python.pythonPath": "/home/shaw/miniconda3/envs/python27/bin/python",
+    "python.autoComplete.extraPaths": [
+        "/home/shaw/catkin_ws/devel/lib/python2.7/dist-packages",
+        "/opt/ros/melodic/lib/python2.7/dist-packages"
+    ]
 }
