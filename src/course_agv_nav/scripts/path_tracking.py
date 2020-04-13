@@ -13,17 +13,18 @@ import time
 class Tracking:
     tracking_thread=None
     goal_index=0
-    sleepTime=1.0
-    arrive_threshold = 0.4
+    sleepTime=0.017
+    arrive_threshold = 0.5
+    terminate_threshold=0.15
     vx = 0.0
     vw = 0.0
     # arguments of coefficients that need to be adjusted
     # graceful control strategy version.
-    k1=1.5
-    k2=2
-    vMax=0.3
-    mu=0.01
-    order=2  # the order of v selector
+    k1=1
+    k2=5
+    vMax=0.20
+    mu=0.03
+    order=1.50  # the order of v selector
     
     def __init__(self):
         self.lock = Lock()
@@ -33,6 +34,7 @@ class Tracking:
         self.path_sub = rospy.Subscriber('/course_agv/global_path',Path,self.pathCallback)
         self.vel_pub = rospy.Publisher('/course_agv/velocity',Twist, queue_size=1)
         self.midpose_pub = rospy.Publisher('/course_agv/mid_goal',PoseStamped,queue_size=1)
+        self.isTracking=False
         pass
     def updateGlobalPose(self):
         # update the AGV's current pose and the progress of mid_goal tracking
@@ -54,13 +56,17 @@ class Tracking:
         if dis < self.arrive_threshold and self.goal_index < len(self.path.poses)-1:
             self.goal_index += 1
         self.midpose_pub.publish(self.path.poses[self.goal_index])
-
+        if self.goal_index==len(self.path.poses)-1 and dis<self.terminate_threshold:
+            self.isTracking=False
+            return
+        
     def pathCallback(self,msg):
         print("get path msg!!!!!",msg)
         self.path = msg
         self.lock.acquire()
         self.initTracking()
         self.lock.release()
+        self.isTracking=True
         if not self.tracking_thread:
             self.tracking_thread = Thread(target=self.trackThreadFunc)
             self.tracking_thread.start()
@@ -72,39 +78,38 @@ class Tracking:
     def trackThreadFunc(self):
         print("running track thread!!")
         # while self.plan_lastIndex > self.plan_target_ind:
-        while True:
+        while self.isTracking:
             self.planOnce()
             time.sleep(self.sleepTime)
         print("exit track thread!!")
         self.lock.acquire()
-        self.publishVel(True)
+        self.publishVel(zero=True)
         self.lock.release()
         self.tracking_thread = None
-        pass
+        return
     def planOnce(self):
         self.lock.acquire()
 
         self.updateGlobalPose()
-        
-        # if self.goal_index==len(self.path.poses)-1:
-
-
+                
         target = self.path.poses[self.goal_index].pose.position
-
+        
         dx = target.x - self.x
         dy = target.y - self.y
+        
         # see the definition of alpha,beta,rho from the courseware. 
         # Notice that alpha is of the opposite sign.
         beta = math.atan2(dy, dx)
         alpha= beta-self.yaw
         rho=np.linalg.norm([dx,dy])
 
-        kappa=-1/rho*(self.k2*(alpha+math.atan(self.k1*beta))+math.sin(alpha)*(1+self.k1/(1+(self.k1*beta)**2)))
+        # bloody sign problem!
+        kappa=1/rho*(self.k2*(alpha+math.atan(self.k1*beta))+math.sin(alpha)*(1+self.k1/(1+(self.k1*beta)**2)))
         print("kappa={}".format(kappa))
         self.vx=self.vMax/(1+self.mu*abs(kappa)**self.order)
         self.vw=self.vx*kappa
-        print("\tx",self.vx)
-        print("\tw",self.vw)
+        print('\tvx={}'.format(self.vx))
+        print('\tvw={}'.format(self.vw))
 
         self.publishVel()
 

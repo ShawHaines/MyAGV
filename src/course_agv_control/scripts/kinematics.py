@@ -9,7 +9,7 @@ WheelRadius=0.08
 Width=0.227
 
 class Transmitter:
-
+    # the direction of counter-clockwise is positive.
     # private member
     __leftVelocity=0
     __rightVelocity=0
@@ -37,7 +37,7 @@ class Transmitter:
         
     def __init__(self):
         self.subscriber=rospy.Subscriber('/course_agv/velocity',
-            geometry_msgs.msg.Twist,callback=self.onRecieve)
+            geometry_msgs.msg.Twist,callback=self.onRecieve,queue_size=1)
         self.leftPublisher=rospy.Publisher("/course_agv/left_wheel_velocity_controller/command",std_msgs.msg.Float64,queue_size=1)
         self.rightPublisher=rospy.Publisher("/course_agv/right_wheel_velocity_controller/command",std_msgs.msg.Float64,queue_size=1)
         
