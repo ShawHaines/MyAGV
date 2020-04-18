@@ -211,7 +211,7 @@ class GlobalPlanner:
                     
                     # again the messy quaternion
                     quaternion=tf.transformations.quaternion_from_euler(0,0,theta)
-                    self.path.poses[i].pose.orientation=Quaternion(x=quaternion[0],y=quaternion[1],z=quaternion[2],w=quaternion[3])
+                    self.path.poses[i].pose.orientation=Quaternion(quaternion[0],quaternion[1],quaternion[2],quaternion[3])
                 else:
                     # deals with the goal point.
                     self.path.poses[i].pose=self.goal.pose
@@ -234,9 +234,7 @@ class GlobalPlanner:
         # subtract a duration of 0.03 second to ensure the transform.
         self.currentPose.header.__init__(seq=1,stamp=rospy.Time.now()-rospy.Duration(secs=0.03),frame_id="robot_base")
         self.currentPose.pose.position=Point(0,0,0)
-        # the quaternion is really messy...
-        quaternion=tf.transformations.quaternion_from_euler(0,0,1)
-        self.currentPose.pose.orientation=Quaternion(x=quaternion[0],y=quaternion[1],z=quaternion[2],w=quaternion[3])
+        self.currentPose.pose.orientation=Quaternion(0,0,0,1)
         rospy.loginfo(self.currentPose)
         self.currentPose = self.tfListener.transformPose('map',self.currentPose)
         # rospy.loginfo(self.currentPoint.point)

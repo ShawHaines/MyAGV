@@ -18,13 +18,16 @@ class LocalPlanner(object):# the object Base is necessary
     terminate_threshold=0.15
     vx = 0.0
     vw = 0.0
+     # unit: cells per second^2
+    a_max=0.05
+    beta_max=0.3
     
     def __init__(self):
         self.lock = Lock()
         
         self.path = Path(header=Header(0,rospy.Time.now(),"map"))
         self.tfListener = tf.TransformListener()
-        self.path_sub = rospy.Subscriber('/course_agv/global_path',Path,self.pathCallback)
+        self.path_sub = rospy.Subscriber('/course_agv/global_path',Path,self.pathCallback,queue_size=1)
         self.vel_pub = rospy.Publisher('/course_agv/velocity',Twist, queue_size=1)
         self.midpose_pub = rospy.Publisher('/course_agv/mid_goal',PoseStamped,queue_size=1)
         self.isTracking=False
@@ -77,6 +80,7 @@ class LocalPlanner(object):# the object Base is necessary
         print("exit track thread!!")
         self.lock.acquire()
         self.publishVel(zero=True)
+        self.vx,self.vw=0,0
         self.lock.release()
         self.tracking_thread = None
         return
@@ -88,15 +92,25 @@ class LocalPlanner(object):# the object Base is necessary
         cmd.linear.x = self.vx
         cmd.angular.z = self.vw
         if zero:
-            cmd.linear.x = 0
-            cmd.angular.z = 0
+            # improved to gentle brake
+            while abs(self.vx)>self.a_max*self.sleepTime or abs(self.vw)>self.beta_max*self.sleepTime:
+                if abs(self.vx)>self.a_max*self.sleepTime:
+                    self.vx-=np.sign(self.vx)*self.a_max*self.sleepTime
+                    cmd.linear.x  = self.vx
+                if abs(self.vw)>self.beta_max*self.sleepTime:
+                    self.vw-=np.sign(self.vw)*self.beta_max*self.sleepTime
+                    cmd.angular.z = self.vw
+                self.vel_pub.publish(cmd)
+                time.sleep(self.sleepTime)
+            cmd.linear.x =0
+            cmd.angular.z=0
         self.vel_pub.publish(cmd)
 
 
 def main():
     rospy.init_node('local_planner',anonymous=False)
     lp = LocalPlanner()
-    time.sleep(0.5)
+    # time.sleep(0.5)
     # gp.test()
     rospy.spin()
     pass

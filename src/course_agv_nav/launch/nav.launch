@@ -11,7 +11,7 @@
     <node pkg="course_agv_nav" type="global_planner.py" name="global_planner" ns="course_agv"  output="screen" launch-prefix="xterm -e"/>
 
     <!-- <node pkg="course_agv_nav" type="stupid_tracking.py" name="stupid_tracking" ns="course_agv" output="screen" launch-prefix="xterm -e"/> -->
-    <node pkg="course_agv_nav" type="path_tracking.py" name="path_tracking" ns="course_agv" output="screen" launch-prefix="xterm -e"/>
+    <!-- <node pkg="course_agv_nav" type="DWA.py" name="path_tracking" ns="course_agv" output="screen" launch-prefix="xterm -e"/> -->
     
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find course_agv_nav)/launch/nav.rviz"/>
 </launch>
