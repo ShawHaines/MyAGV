@@ -23,4 +23,5 @@
   * 生成array : ones,zeros,identity,arange
   * 矩阵计算 : +-*/,transpose,average,dot,linalg.svd
   * 分片:a[i:i+2,j:j+2]
+  * indexing规则:上界exclude, 下界include.(类似C++)
 * 在书写每一条语句,想清楚维数是多少 !!! (numpy shape)
