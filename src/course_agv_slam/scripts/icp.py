@@ -131,7 +131,7 @@ class ICP:
         print("srcCenter:{}".format(srcCenter))
         print("tarCenter:{}".format(tarCenter))
         # TODO: There's still improving space.
-        q_all=[np.dot(np.reshape(src[:,i],(2,1)),np.reshape(tar[:,i],(1,2))) for i in range(length)]
+        q_all=[np.dot(np.reshape(src[:,i]-srcCenter,(2,1)),np.reshape(tar[:,i]-tarCenter,(1,2))) for i in range(length)]
         # print(q_all)
         W=np.sum(q_all,axis=0)
         print("W={}".format(W))

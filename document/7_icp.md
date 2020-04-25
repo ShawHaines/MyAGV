@@ -25,3 +25,18 @@
   * 分片:a[i:i+2,j:j+2]
   * indexing规则:上界exclude, 下界include.(类似C++)
 * 在书写每一条语句,想清楚维数是多少 !!! (numpy shape)
+
+launch:
+```bash
+roslaunch course_agv_gazebo course_agv_world.launch
+roslaunch course_agv_slam rviz.launch
+roslaunch course_agv_slam icp.launch
+```
+
+or you can use `rosbag` in place of gazebo:
+```bash
+roslaunch course_agv_slam rviz.launch
+roslaunch course_agv_slam icp.launch
+
+rosbag play ~/bagfile/*.bag
+```
