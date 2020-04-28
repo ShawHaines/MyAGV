@@ -9,7 +9,8 @@ Panels:
         - /RobotModel1
         - /TF1
         - /TF1/Frames1
-        - /Odometry1
+        - /Odometry2
+        - /Odometry2/Shape1
       Splitter Ratio: 0.5
     Tree Height: 549
   - Class: rviz/Selection
@@ -66,6 +67,35 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
+        course_agv__hokuyo__link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        course_agv__imu:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        course_agv__left_wheel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        course_agv__right_wheel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        robot_base:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        robot_chassis:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
@@ -85,8 +115,6 @@ Visualization Manager:
           Value: true
         course_agv__right_wheel:
           Value: true
-        icp_odom:
-          Value: true
         map:
           Value: true
         robot_base:
@@ -102,8 +130,6 @@ Visualization Manager:
       Show Names: false
       Tree:
         world_base:
-          icp_odom:
-            {}
           map:
             robot_base:
               course_agv__hokuyo__link:
@@ -201,6 +227,40 @@ Visualization Manager:
       Topic: /icp_odom
       Unreliable: false
       Value: true
+    - Angle Tolerance: 0.10000000149011612
+      Class: rviz/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: true
+      Enabled: true
+      Keep: 100
+      Name: Odometry
+      Position Tolerance: 0.10000000149011612
+      Shape:
+        Alpha: 1
+        Axes Length: 1
+        Axes Radius: 0.10000000149011612
+        Color: 32; 74; 135
+        Head Length: 0.30000001192092896
+        Head Radius: 0.10000000149011612
+        Shaft Length: 1
+        Shaft Radius: 0.05000000074505806
+        Value: Arrow
+      Topic: /wheel_odom
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -229,16 +289,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 22.01395034790039
+      Distance: 12.346969604492188
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -2.848757266998291
-        Y: -2.1073379516601562
-        Z: -0.5669258236885071
+        X: -4.246153354644775
+        Y: -0.2544461488723755
+        Z: -0.028161119669675827
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -266,4 +326,4 @@ Window Geometry:
     collapsed: true
   Width: 1200
   X: 546
-  Y: 32
+  Y: 27
