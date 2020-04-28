@@ -60,32 +60,42 @@ class ICP:
         self.laser_count = 0
         time_0 = rospy.Time.now()
         self.src_pc = self.laserToNumpy(msg)
-        print('input cnt: ',self.src_pc.shape[1])
+        # print('input cnt: ',self.src_pc.shape[1])
 
         # init some variables
         rotation = np.identity(2)
         translation=np.zeros(2)
         iterations=0
+        temp=np.copy(self.tar_pc)
         
         # don't move src_pc, adjust tar_pc to fit src.
         for _ in range(self.max_iter): # I haven't seen this grammar...
-            neighbour=self.findNearest()
-            if np.sum(neighbour.distances)<self.tolerance:
+            neighbour=self.findNearest(self.src_pc,temp)
+            deviation=np.sum(neighbour.distances)
+            if deviation<self.tolerance:
                 break
-            temp=np.zeros_like(self.tar_pc)
             # change the pairing rule
             for i in range(np.size(self.tar_pc,1)):
                 temp[:,i]=self.tar_pc[:,neighbour.tar_indices[i]]
-            self.tar_pc=temp
+            # FIXME: again the SHALLOW COPY!
+            self.tar_pc=np.copy(temp)
             rotation,translation=self.getTransform()
             # transform tar_pc:
             for i in range(np.size(self.tar_pc,1)):
-                self.tar_pc[:,i]=np.dot(rotation,self.tar_pc[:,i])+translation
+                # FIXME: You CAN'T change the target!
+                temp[:,i]=np.dot(rotation,self.tar_pc[:,i])+translation
             iterations += 1
+            print("d= {} (iterations{})".format(deviation,iterations))
         
+        print("--------------------------------------")
         print("total iterations: {}".format(iterations))
-        self.tar_pc = self.src_pc # what is this for? fitting is between the adjacent frames..
+        # print("total deviation: {}".format(np.sum(neighbour.distances)))
+        self.tar_pc = np.copy(self.src_pc) # what is this for? fitting is between the adjacent frames..
+        # thanks god it works alright even under shallow copy..
         T=np.identity(3)
+        # because of the relative relation between frames, R and T should reverse
+        rotation=np.transpose(rotation)
+        translation=-translation
         T[0:2,0:2]=rotation
         T[0:2,2]=translation
         self.publishResult(T)
@@ -93,30 +103,31 @@ class ICP:
         duration=time_1-time_0
         print("time_cost: {} s".format(duration.to_sec()))
         pass
-    def findNearest(self):
+    def findNearest(self,src,tar):
         # find the pairing strategy between src and tar.
         neighbour = NeighBor()
-        length=np.size(self.src_pc,1)
+        length=np.size(src,1)
         neighbour.src_indices=range(length)
         # or you can use .tolist() method, since there's only one dimension, we can stick with this.
         neighbour.tar_indices=list(np.zeros(length)) 
         neighbour.distances=list(np.zeros(length))
         # temp=self.tar_pc # FIXME: shallow copy!
-        temp=np.copy(self.tar_pc)
+        temp=np.copy(tar)
         
         for i in range(length):
             # one formula solves everything.
-            dist=np.linalg.norm(np.subtract(temp,np.reshape(self.src_pc[:,i],(2,1))),axis=0)
+            dist=np.linalg.norm(np.subtract(temp,np.reshape(src[:,i],(2,1))),axis=0)
             index=np.argmin(dist)
             if dist[index]>=self.dis_th:
-                print("The fitting may be not good")
+                # print("The fitting may be not good")
+                pass
             neighbour.tar_indices[i]=index
             neighbour.distances[i]=dist[index]
             # remove this point, move it to inf
             temp[:,index]=np.array([self.inf,0])
 
-        print("neighbour:\n\ttar_indices:{}".format(neighbour.tar_indices))
-        print("\tdistances:{}".format(neighbour.distances))
+        # print("neighbour:\n\ttar_indices:{}".format(neighbour.tar_indices))
+        # print("\tdistances:{}".format(neighbour.distances))
         return neighbour
 
     def getTransform(self):
@@ -128,25 +139,25 @@ class ICP:
         srcCenter=np.mean(src,axis=1)
         tarCenter=np.mean(tar,axis=1)
         
-        print("srcCenter:{}".format(srcCenter))
-        print("tarCenter:{}".format(tarCenter))
+        # print("srcCenter:{}".format(srcCenter))
+        # print("tarCenter:{}".format(tarCenter))
         # TODO: There's still improving space.
-        q_all=[np.dot(np.reshape(src[:,i]-srcCenter,(2,1)),np.reshape(tar[:,i]-tarCenter,(1,2))) for i in range(length)]
+        q_all=[np.dot(np.reshape(tar[:,i]-tarCenter,(2,1)),np.reshape(src[:,i]-srcCenter,(1,2))) for i in range(length)]
         # print(q_all)
         W=np.sum(q_all,axis=0)
-        print("W={}".format(W))
+        # print("W={}".format(W))
         U,S,V=np.linalg.svd(W)
         rotation=np.dot(V,np.transpose(U))
         translation=srcCenter-np.dot(rotation,tarCenter)
-        print("rotation:{}".format(rotation))
-        print("translation:{}".format(translation))
+        # print("rotation:{}".format(rotation))
+        # print("translation:{}".format(translation))
         return (rotation,translation)
 
     def publishResult(self,T):
         # what exactly is this T? T is a affine transformation matrix of 1 higher order.
         print("T: {}".format(T))
         delta_yaw = math.atan2(T[1,0],T[0,0])
-        print("sensor-delta-xyt: ",T[0,2],T[1,2],delta_yaw)
+        print("sensor-delta-xyt: {},{},{}".format(T[0,2],T[1,2],delta_yaw))
         # improved readability
         rotation=T[0:2,0:2]
         translation=T[0:2,2]
@@ -192,6 +203,7 @@ class ICP:
         angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)
         # ufunc, high performance
         pc = np.vstack((np.multiply(np.cos(angle_l),range_l),np.multiply(np.sin(angle_l),range_l)))
+        # print("Numpy pc:{}".format(pc))
         return pc
 
     def calcDist(self,a,b):
