@@ -8,8 +8,8 @@ command = {
     "vx":0.0,
     "vw":0.0,
     "step":0.01,
-    "vmax":3.0,
-    "wmax":3.0
+    "vmax":0.5,
+    "wmax":1.0
 }
 def limitNum(num,minNum,maxNum):
     if num > maxNum:

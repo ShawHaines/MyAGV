@@ -41,7 +41,7 @@ class ICP:
         self.tar_pc=None
 
 
-        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
+        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=1)
         self.odom_pub = rospy.Publisher('icp_odom',Odometry,queue_size=1)
         self.odom_broadcaster = tf.TransformBroadcaster()
     def laserCallback(self,msg):
@@ -107,25 +107,30 @@ class ICP:
         # find the pairing strategy between src and tar.
         neighbour = NeighBor()
         length=np.size(src,1)
-        neighbour.src_indices=range(length)
         # or you can use .tolist() method, since there's only one dimension, we can stick with this.
+        neighbour.src_indices=list(np.zeros(length))
         neighbour.tar_indices=list(np.zeros(length)) 
         neighbour.distances=list(np.zeros(length))
-        # temp=self.tar_pc # FIXME: shallow copy!
-        temp=np.copy(tar)
         
+        temp=[np.linalg.norm(src[:,i]-tar[:,j]) for i in range(length) for j in range(length)]
+        temp=np.reshape(temp,(length,length))
+        # print("distance matrix:{}".format(temp))
         for i in range(length):
-            # one formula solves everything.
-            dist=np.linalg.norm(np.subtract(temp,np.reshape(src[:,i],(2,1))),axis=0)
-            index=np.argmin(dist)
-            if dist[index]>=self.dis_th:
-                # print("The fitting may be not good")
-                pass
-            neighbour.tar_indices[i]=index
-            neighbour.distances[i]=dist[index]
-            # remove this point, move it to inf
-            temp[:,index]=np.array([self.inf,0])
-
+            index=np.argmin(temp)
+            row,column=index//length,index%length
+            neighbour.src_indices[i]=row
+            neighbour.tar_indices[i]=column
+            neighbour.distances[i]  =temp[row,column]
+            # removing this point pair...
+            temp[row,:]=self.inf
+            temp[:,column]=self.inf
+        # very pythonic and elegent use of reordering! sort according to the src_indices in ascending order.
+        ordering=np.argsort(neighbour.src_indices)
+        # only array supports such operations...
+        neighbour.src_indices=list(np.array(neighbour.src_indices)[ordering])
+        neighbour.tar_indices=list(np.array(neighbour.tar_indices)[ordering])
+        neighbour.distances  =list(np.array(neighbour.distances)[ordering])
+        
         # print("neighbour:\n\ttar_indices:{}".format(neighbour.tar_indices))
         # print("\tdistances:{}".format(neighbour.distances))
         return neighbour
