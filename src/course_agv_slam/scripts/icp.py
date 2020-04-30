@@ -4,10 +4,16 @@ import rospy
 import tf
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import Pose,Quaternion,Point
 from std_msgs.msg import Header
 import numpy as np
 import math
+from course_agv_slam.srv import Odometry_srv
+
+def toArray(p):
+    return np.array([p.x,p.y,p.z])
+def toList(q):
+    return [q.x,q.y,q.z,q.w]
 class NeighBor:
     def __init__(self):
         self.distances = []
@@ -39,7 +45,7 @@ class ICP:
         self.src_pc=None
         # target point cloud matrix
         self.tar_pc=None
-
+        self.estimatedPose=Pose(position=Point(0,0,0),orientation=Quaternion(0,0,0,1))
 
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=1)
         self.odom_pub = rospy.Publisher('icp_odom',Odometry,queue_size=1)
@@ -63,13 +69,40 @@ class ICP:
         # print('input cnt: ',self.src_pc.shape[1])
 
         # init some variables
-        rotation = np.identity(2)
-        translation=np.zeros(2)
+        rospy.wait_for_service("/course_agv/odometry")
+        try:
+            newPose=rospy.ServiceProxy("/course_agv/odometry",Odometry_srv)()
+            newPose=newPose.pose
+            # print("New Pose(Wheel):{}".format(newPose))
+            # print("type: {}".format(type(newPose)))
+            # print("Original Pose(Wheel):{}".format(self.estimatedPose))
+            # print("type: {}".format(type(self.estimatedPose)))
+            translation=toArray(newPose.position)-toArray(self.estimatedPose.position)
+            translation=translation[0:2]
+            newEuler=tf.transformations.euler_from_quaternion(toList(newPose.orientation))
+            oldEuler=tf.transformations.euler_from_quaternion(toList(self.estimatedPose.orientation))
+            rotation=tf.transformations.euler_matrix(0,0,newEuler[2]-oldEuler[2])
+            rotation=rotation[0:2,0:2]
+            # change to self frame
+            
+            translation=np.dot(tf.transformations.euler_matrix(oldEuler[0],oldEuler[1],oldEuler[2])[0:2,0:2],translation)
+            self.estimatedPose=newPose
+        except rospy.ServiceException, e:
+            print("wheel odometry failed: {}".format(e))
+            # no reference from wheel.
+            rotation = np.identity(2)
+            translation=np.zeros(2)
+        print("initial rotation:{} translation:{}".format(rotation,translation))
         iterations=0
         temp=np.copy(self.tar_pc)
         
         # don't move src_pc, adjust tar_pc to fit src.
         for _ in range(self.max_iter): # I haven't seen this grammar...
+            # transform tar_pc:
+            for i in range(np.size(self.tar_pc,1)):
+                # FIXME: You CAN'T change the target!
+                temp[:,i]=np.dot(rotation,self.tar_pc[:,i])+translation
+            iterations += 1
             neighbour=self.findNearest(self.src_pc,temp)
             deviation=np.sum(neighbour.distances)
             if deviation<self.tolerance:
@@ -80,11 +113,7 @@ class ICP:
             # FIXME: again the SHALLOW COPY!
             self.tar_pc=np.copy(temp)
             rotation,translation=self.getTransform()
-            # transform tar_pc:
-            for i in range(np.size(self.tar_pc,1)):
-                # FIXME: You CAN'T change the target!
-                temp[:,i]=np.dot(rotation,self.tar_pc[:,i])+translation
-            iterations += 1
+            
             print("d= {} (iterations{})".format(deviation,iterations))
         
         print("--------------------------------------")

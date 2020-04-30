@@ -11,6 +11,6 @@
 		<param name="tolerance" value="0"/>
 		<param name="dis_th" value="3"/>
 	</node>
-
+	<node pkg="course_agv_slam" type="wheel.py" name="wheel_odometry" output="screen" launch-prefix="xterm -e" />
     <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find course_agv_slam)/launch/course_agv.rviz" /> -->
 </launch>

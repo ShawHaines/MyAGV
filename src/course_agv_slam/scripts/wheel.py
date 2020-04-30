@@ -10,6 +10,7 @@ from threading import Lock,Thread
 import numpy as np
 import math
 import time
+from course_agv_slam.srv import Odometry_srv,Odometry_srvResponse
 
 def toList(q):
     return [q.x,q.y,q.z,q.w]
@@ -29,6 +30,7 @@ class WheelOdometry(object):
         self.odometry.pose.pose=Pose(position=Point(0,0,0),orientation=Quaternion(0,0,0,1))
         
         self.odometryPublisher=rospy.Publisher("wheel_odom",Odometry,queue_size=1)
+        self.service=rospy.Service("/course_agv/odometry",Odometry_srv,self.respondOdometry,buff_size=1)
         self.jointstates=None
         self.working=True
         self.loop()
@@ -79,6 +81,8 @@ class WheelOdometry(object):
         self.odometry.header.seq  =self.jointstates.header.seq
         self.lock.release()
         return True
+    def respondOdometry(self,request):
+        return self.odometry.pose.pose
     def loop(self):
         while self.working:
             success=self.positioning()
