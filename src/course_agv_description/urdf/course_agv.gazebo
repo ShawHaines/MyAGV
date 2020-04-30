@@ -11,18 +11,20 @@
     </gazebo>
 
     <gazebo reference="robot_chassis">
+        <mu1>0.0</mu1>
+        <mu2>0.0</mu2>
         <material>Gazebo/DarkYellow</material>
     </gazebo>
 
     <gazebo reference="course_agv__left_wheel">
-        <mu1>0.2</mu1>
-        <mu2>0.2</mu2>
+        <mu1>20.0</mu1>
+        <mu2>20.0</mu2>
         <material>Gazebo/DarkGrey</material>
     </gazebo>
 
     <gazebo reference="course_agv__right_wheel">
-        <mu1>0.2</mu1>
-        <mu2>0.2</mu2>
+        <mu1>20.0</mu1>
+        <mu2>20.0</mu2>
         <material>Gazebo/DarkGrey</material>
     </gazebo>
 

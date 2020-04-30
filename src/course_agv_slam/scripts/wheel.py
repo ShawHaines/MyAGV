@@ -9,6 +9,7 @@ from std_msgs.msg import Header
 from threading import Lock,Thread
 import numpy as np
 import math
+import time
 
 def toList(q):
     return [q.x,q.y,q.z,q.w]
@@ -16,11 +17,11 @@ def toQuaternion(l):
     return Quaternion(l[0],l[1],l[2],l[3])
 
 class WheelOdometry(object):
-    deltaT=1
+    deltaT=0.25
     WheelRadius=0.08
     Width=0.227
     def __init__(self):
-        self.wheelSubscriber=rospy.Subscriber("/course_agv/joint_states",JointState,callback=self.updateOdometry,queue_size=1)
+        self.wheelSubscriber=rospy.Subscriber("/course_agv/joint_states",JointState,callback=self.updateJointState,queue_size=1)
         self.lock=Lock()
         self.leftPosition=self.rightPosition=None
         # Odometry estimated by wheel odometry.
@@ -28,21 +29,30 @@ class WheelOdometry(object):
         self.odometry.pose.pose=Pose(position=Point(0,0,0),orientation=Quaternion(0,0,0,1))
         
         self.odometryPublisher=rospy.Publisher("wheel_odom",Odometry,queue_size=1)
-    def updateOdometry(self,data):
-        dt=data.header.stamp-self.odometry.header.stamp
+        self.jointstates=None
+        self.working=True
+        self.loop()
+        
+    def updateJointState(self,data):
+        self.lock.acquire()
         if not self.leftPosition:
             self.leftPosition =data.position[0]
             self.rightPosition=data.position[1]
-        if (dt).to_sec()<self.deltaT:
-            print("skipped seq {}".format(data.header.seq))
-            return
+        self.jointstates=data
+        self.lock.release()
+        return
+    def publishOdometry(self):
+        self.odometryPublisher.publish(self.odometry)
+        return
+    def positioning(self):
+        if not self.jointstates:
+            return False
         self.lock.acquire()
-        print("accepted seq {}".format(data.header.seq))
         # the distance covered by each wheel
-        sl=(data.position[0]-self.leftPosition) *self.WheelRadius
-        sr=(data.position[1]-self.rightPosition)*self.WheelRadius
-        self.leftPosition =data.position[0]
-        self.rightPosition=data.position[1]
+        sl=(self.jointstates.position[0]-self.leftPosition) *self.WheelRadius
+        sr=(self.jointstates.position[1]-self.rightPosition)*self.WheelRadius
+        self.leftPosition =self.jointstates.position[0]
+        self.rightPosition=self.jointstates.position[1]
         dtheta=(sr-sl)/self.Width
         dl=(sl+sr)/2
         epsilon=1e-10
@@ -65,18 +75,24 @@ class WheelOdometry(object):
         self.odometry.pose.pose.orientation=toQuaternion(tf.transformations.quaternion_from_euler(euler[0],euler[1],euler[2]))
         print("position {}".format(self.odometry.pose.pose.position))
         print("orientation {}".format(euler))
-        self.odometry.header.stamp=data.header.stamp
-        self.odometry.header.seq  =data.header.seq
-        self.publishOdometry()
+        self.odometry.header.stamp=self.jointstates.header.stamp
+        self.odometry.header.seq  =self.jointstates.header.seq
         self.lock.release()
+        return True
+    def loop(self):
+        while self.working:
+            success=self.positioning()
+            if success:
+                self.publishOdometry()
+            time.sleep(self.deltaT)
+            
+        print("exit looping...")
         return
-    def publishOdometry(self):
-        self.odometryPublisher.publish(self.odometry)
-        return
+            
 def main():
     rospy.init_node('wheel_odometry')
     wheel= WheelOdometry()
     rospy.spin()
 
 if __name__ == "__main__":
-    main()
+    main() 
