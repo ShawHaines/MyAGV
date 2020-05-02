@@ -85,7 +85,11 @@ class ICP:
             rotation=rotation[0:2,0:2]
             # change to self frame
             
-            translation=np.dot(tf.transformations.euler_matrix(oldEuler[0],oldEuler[1],oldEuler[2])[0:2,0:2],translation)
+            translation=np.dot(tf.transformations.euler_matrix
+                    (oldEuler[0],oldEuler[1],-oldEuler[2])[0:2,0:2],translation)
+            # FIXME: learn about relativity! the laser in the frame moves opposite
+            translation=-translation
+            rotation=np.transpose(rotation)
             self.estimatedPose=newPose
         except rospy.ServiceException, e:
             print("wheel odometry failed: {}".format(e))

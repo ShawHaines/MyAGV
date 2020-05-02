@@ -69,6 +69,7 @@ class WheelOdometry(object):
         # euler is much more convenient than quaternions.
         euler=list(tf.transformations.euler_from_quaternion(toList(self.odometry.pose.pose.orientation)))
         displace=np.array([dx,dy,0,1])
+        # be careful to realize what this euler matrix is!
         displace=np.dot(tf.transformations.euler_matrix(euler[0],euler[1],euler[2]),displace)
         print("dx {} dy {} dtheta {}".format(dx,dy,dtheta))
         self.odometry.pose.pose.position.x+=displace[0]
