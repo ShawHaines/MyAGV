@@ -16,8 +16,8 @@ import time
 class Tracking(LocalPlanner):
     # arguments of coefficients that need to be adjusted
     # graceful control strategy version.
-    k1=1
-    k2=5
+    k1=0.8
+    k2=3.0
     vMax=0.20
     mu=0.03
     order=1.50  # the order of v selector

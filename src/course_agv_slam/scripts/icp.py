@@ -69,8 +69,8 @@ class ICP:
         # print('input cnt: ',self.src_pc.shape[1])
 
         # init some variables
-        rospy.wait_for_service("/course_agv/odometry")
         try:
+            rospy.wait_for_service("/course_agv/odometry",timeout=0.1)
             newPose=rospy.ServiceProxy("/course_agv/odometry",Odometry_srv)()
             newPose=newPose.pose
             # print("New Pose(Wheel):{}".format(newPose))
@@ -91,26 +91,30 @@ class ICP:
             translation=-translation
             rotation=np.transpose(rotation)
             self.estimatedPose=newPose
-        except rospy.ServiceException, e:
+        except rospy.ROSException, e:
             print("wheel odometry failed: {}".format(e))
             # no reference from wheel.
             rotation = np.identity(2)
             translation=np.zeros(2)
+
         print("initial rotation:{} translation:{}".format(rotation,translation))
         iterations=0
         temp=np.copy(self.tar_pc)
-        
+        lastDeviation=0
+
         # don't move src_pc, adjust tar_pc to fit src.
-        for _ in range(self.max_iter): # I haven't seen this grammar...
+        for _ in range(self.max_iter): # I haven't seen this grammar before...
             # transform tar_pc:
             for i in range(np.size(self.tar_pc,1)):
                 # FIXME: You CAN'T change the target!
                 temp[:,i]=np.dot(rotation,self.tar_pc[:,i])+translation
             iterations += 1
+
             neighbour=self.findNearest(self.src_pc,temp)
             deviation=np.sum(neighbour.distances)
-            if deviation<self.tolerance:
+            if lastDeviation==deviation or deviation<self.tolerance:
                 break
+            lastDeviation=deviation
             # change the pairing rule
             for i in range(np.size(self.tar_pc,1)):
                 temp[:,i]=self.tar_pc[:,neighbour.tar_indices[i]]
@@ -185,7 +189,8 @@ class ICP:
         W=np.sum(q_all,axis=0)
         # print("W={}".format(W))
         U,S,V=np.linalg.svd(W)
-        rotation=np.dot(V,np.transpose(U))
+        # FIXME: notice the difference of svd decomposing declaration!
+        rotation=np.transpose(np.dot(U,V))
         translation=srcCenter-np.dot(rotation,tarCenter)
         # print("rotation:{}".format(rotation))
         # print("translation:{}".format(translation))
@@ -195,14 +200,15 @@ class ICP:
         # what exactly is this T? T is a affine transformation matrix of 1 higher order.
         print("T: {}".format(T))
         delta_yaw = math.atan2(T[1,0],T[0,0])
+        # [[cos(theta),-sin(theta)],[sin(theta),cos(theta)]]
         print("sensor-delta-xyt: {},{},{}".format(T[0,2],T[1,2],delta_yaw))
         # improved readability
         rotation=T[0:2,0:2]
         translation=T[0:2,2]
         x,y,theta=self.sensor_sta
         x,y=np.array([x,y])+np.dot(rotation,translation)
-        x+=math.cos(theta)*T[0,2]-math.sin(theta)*T[1,2]
-        y+=math.sin(theta)*T[0,2]+math.cos(theta)*T[1,2]
+        # x+=math.cos(theta)*T[0,2]-math.sin(theta)*T[1,2]
+        # y+=math.sin(theta)*T[0,2]+math.cos(theta)*T[1,2]
         theta+=delta_yaw
         self.sensor_sta=[x,y,theta]
         # s = self.sensor_sta

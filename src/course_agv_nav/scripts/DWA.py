@@ -19,7 +19,7 @@ class DWAPlanner(LocalPlanner):
     # arguments
     safeDistance=0.4 # the lowest distance permitted.
     deltaT=0.5
-    v_max=0.2
+    v_max=0.35
     w_max=0.6
     v_slice=5
     w_slice=10
@@ -34,7 +34,8 @@ class DWAPlanner(LocalPlanner):
         super(DWAPlanner,self).__init__()
         self.laserListener=rospy.Subscriber("/course_agv/laser/scan",LaserScan,callback=self.updateLaser,queue_size=1)
         self.laserInfo=LaserScan()
-        self.sleepTime=self.deltaT
+        # self.sleepTime=self.deltaT
+        self.sleepTime=0.25
         self.arrive_threshold=1.0
         # self.poseDebug=rospy.Publisher("/course_agv/poseDebug",PoseStamped,queue_size=0)
 
@@ -111,7 +112,7 @@ class DWAPlanner(LocalPlanner):
         # ps: PoseStamped
 
         # is there an easy way in tf to transform laserscan type? like pointcloud?
-        theta=np.arange(self.laserInfo.angle_min,self.laserInfo.angle_max,self.laserInfo.angle_increment)              
+        theta=np.linspace(self.laserInfo.angle_min,self.laserInfo.angle_max,len(self.laserInfo.ranges))
         # good thing that hokuyo differs from base only in z coordinate. Otherwise it would have been much harder.
         x=np.cos(theta)*self.laserInfo.ranges
         y=np.sin(theta)*self.laserInfo.ranges
