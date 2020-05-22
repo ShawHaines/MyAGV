@@ -25,7 +25,7 @@ class ICP:
     def __init__(self):
         self.laser_count  = 0
         # process once every 5 laser frames
-        self.laser_inteval= 5
+        self.laser_inteval= 1
         # robot init states
         self.robot_x = float(rospy.get_param('/icp/robot_x',0))
         self.robot_y = float(rospy.get_param('/icp/robot_y',0))
@@ -61,7 +61,7 @@ class ICP:
         
         # process once every 5 laser scan because laser fps is too high
         self.laser_count += 1
-        if self.laser_count <= self.laser_inteval:
+        if self.laser_count < self.laser_inteval:
             return
         self.laser_count = 0
         time_0 = rospy.Time.now()
@@ -81,15 +81,11 @@ class ICP:
             translation=translation[0:2]
             newEuler=tf.transformations.euler_from_quaternion(toList(newPose.orientation))
             oldEuler=tf.transformations.euler_from_quaternion(toList(self.estimatedPose.orientation))
-            rotation=tf.transformations.euler_matrix(0,0,newEuler[2]-oldEuler[2])
-            rotation=rotation[0:2,0:2]
+            rotation=tf.transformations.euler_matrix(0,0,newEuler[2]-oldEuler[2])[0:2,0:2]
             # change to self frame
             
             translation=np.dot(tf.transformations.euler_matrix
                     (oldEuler[0],oldEuler[1],-oldEuler[2])[0:2,0:2],translation)
-            # FIXME: learn about relativity! the laser in the frame moves opposite
-            translation=-translation
-            rotation=np.transpose(rotation)
             self.estimatedPose=newPose
         except rospy.ROSException, e:
             print("wheel odometry failed: {}".format(e))
@@ -97,7 +93,11 @@ class ICP:
             rotation = np.identity(2)
             translation=np.zeros(2)
 
-        print("initial rotation:{} translation:{}".format(rotation,translation))
+        print("initial rotation:\n{} \ntranslation:{}".format(rotation,translation))
+        # FIXME: learn about relativity! the laser in the frame moves opposite
+        translation=-translation
+        rotation=np.transpose(rotation)
+        
         iterations=0
         temp=np.copy(self.tar_pc)
         lastDeviation=0
@@ -131,10 +131,8 @@ class ICP:
         # thanks god it works alright even under shallow copy..
         T=np.identity(3)
         # because of the relative relation between frames, R and T should reverse
-        rotation=np.transpose(rotation)
-        translation=-translation
-        T[0:2,0:2]=rotation
-        T[0:2,2]=translation
+        T[0:2,0:2]=np.transpose(rotation)
+        T[0:2,2]=-translation
         self.publishResult(T)
         time_1 = rospy.Time.now()
         duration=time_1-time_0
@@ -177,6 +175,10 @@ class ICP:
         src=self.src_pc
         tar=self.tar_pc
         # those are references, or alias
+        if np.size(src,1)!= np.size(tar,1):
+            print("error in length!")
+            # skipping
+            return(np.identity(2),np.array([0,0]))
         length=np.size(src,1)
         srcCenter=np.mean(src,axis=1)
         tarCenter=np.mean(tar,axis=1)
@@ -201,21 +203,21 @@ class ICP:
         print("T: {}".format(T))
         delta_yaw = math.atan2(T[1,0],T[0,0])
         # [[cos(theta),-sin(theta)],[sin(theta),cos(theta)]]
-        print("sensor-delta-xyt: {},{},{}".format(T[0,2],T[1,2],delta_yaw))
+        print("sensor-delta-xyt:[{},{},{}]".format(T[0,2],T[1,2],delta_yaw))
         # improved readability
-        rotation=T[0:2,0:2]
+        # rotation=T[0:2,0:2]
         translation=T[0:2,2]
         x,y,theta=self.sensor_sta
-        x,y=np.array([x,y])+np.dot(rotation,translation)
-        # x+=math.cos(theta)*T[0,2]-math.sin(theta)*T[1,2]
-        # y+=math.sin(theta)*T[0,2]+math.cos(theta)*T[1,2]
         theta+=delta_yaw
+        # the position of theta+=delta_yaw needs consideration.
+        eulerMatrix=tf.transformations.euler_matrix(0,0,theta)[0:2,0:2]
+        x,y=np.array([x,y])+np.dot(eulerMatrix,translation)
         self.sensor_sta=[x,y,theta]
         # s = self.sensor_sta
         # self.sensor_sta[0] = s[0] + math.cos(s[2])*T[0,2] - math.sin(s[2])*T[1,2]
         # self.sensor_sta[1] = s[1] + math.sin(s[2])*T[0,2] + math.cos(s[2])*T[1,2]
         # self.sensor_sta[2] = s[2] + delta_yaw
-        print("sensor-global: ",self.sensor_sta)
+        print("sensor-global: {}".format(self.sensor_sta))
 
         # tf broadcast
         s = self.sensor_sta
@@ -231,7 +233,7 @@ class ICP:
 
         odom.pose.pose.position.x = s[0]
         odom.pose.pose.position.y = s[1]
-        odom.pose.pose.position.z = 0.001
+        odom.pose.pose.position.z = 0
         odom.pose.pose.orientation.x = q[0]
         odom.pose.pose.orientation.y = q[1]
         odom.pose.pose.orientation.z = q[2]
