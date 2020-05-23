@@ -6,7 +6,7 @@ import rospy
 
 # define the scaling
 WheelRadius=0.08
-Width=0.2
+Width=0.227
 
 class Transmitter:
 

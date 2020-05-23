@@ -36,7 +36,7 @@ src
     │   └── course_agv_world.launch
     └── package.xml
 ```
-主要要写这两个有注释的
+ 主要要写这两个有注释的
 
 
 ## 在rviz上检查你的机器人模型
