@@ -43,9 +43,11 @@ class WheelOdometry(object):
         self.jointstates=data
         self.lock.release()
         return
+        
     def publishOdometry(self):
         self.odometryPublisher.publish(self.odometry)
         return
+
     def positioning(self):
         if not self.jointstates:
             return False
@@ -82,8 +84,10 @@ class WheelOdometry(object):
         self.odometry.header.seq  =self.jointstates.header.seq
         self.lock.release()
         return True
+
     def respondOdometry(self,request):
         return self.odometry.pose.pose
+
     def loop(self):
         while self.working:
             success=self.positioning()
