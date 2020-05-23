@@ -68,6 +68,18 @@ class ICP:
         self.src_pc = self.laserToNumpy(msg)
         # print('input cnt: ',self.src_pc.shape[1])
 
+        T=self.processICP()
+        self.tar_pc = np.copy(self.src_pc) # moving the target to src
+
+        self.publishResult(T)
+        duration=rospy.Time.now()-time_0
+        print("time_cost: {} s".format(duration.to_sec()))
+
+    def processICP(self):
+        '''
+        Process the fitting between self.src_pc and tar_pc.
+        Returns T the transformation matrix.
+        '''
         # init some variables
         try:
             rospy.wait_for_service("/course_agv/odometry",timeout=0.1)
@@ -127,17 +139,12 @@ class ICP:
         print("--------------------------------------")
         print("total iterations: {}".format(iterations))
         # print("total deviation: {}".format(np.sum(neighbour.distances)))
-        self.tar_pc = np.copy(self.src_pc) # what is this for? fitting is between the adjacent frames..
-        # thanks god it works alright even under shallow copy..
         T=np.identity(3)
         # because of the relative relation between frames, R and T should reverse
         T[0:2,0:2]=np.transpose(rotation)
         T[0:2,2]=-translation
-        self.publishResult(T)
-        time_1 = rospy.Time.now()
-        duration=time_1-time_0
-        print("time_cost: {} s".format(duration.to_sec()))
-        pass
+        return T
+
     def findNearest(self,src,tar):
         # find the pairing strategy between src and tar.
         neighbour = NeighBor()

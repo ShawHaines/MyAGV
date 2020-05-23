@@ -6,27 +6,32 @@ from nav_msgs.srv import GetMap
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 import numpy as np
+# wow!
 from icp import ICP
 from ekf import EKF
 import sys
+
 class Localization():
     def __init__(self):
+        # very impressive...
+        # TODO： change it into service
         self.icp = ICP()
         self.ekf = EKF()
         
         # odom robot init states
-        self.robot_x = rospy.get_param('/icp/robot_x',0)
-        self.robot_y = rospy.get_param('/icp/robot_y',0)
-        self.robot_theta = rospy.get_param('/icp/robot_theta',0)
+        self.robot_x = float(rospy.get_param('/icp/robot_x',0))
+        self.robot_y = float(rospy.get_param('/icp/robot_y',0))
+        self.robot_theta = float(rospy.get_param('/icp/robot_theta',0))
         self.sensor_sta = [self.robot_x,self.robot_y,self.robot_theta]
         self.isFirstScan = True
         self.src_pc = []
         self.tar_pc = []
 
-        # State Vector [x y yaw]
+        # State Vector [x y yaw]'
         self.xOdom = np.zeros((3,1))
         self.xEst = np.zeros((3,1))
-        self.PEst = np.eye(3)
+        self.PEst = np.eye(3) # the same with identity
+        
         
         # map observation
         self.obstacle = []

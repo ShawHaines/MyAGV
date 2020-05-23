@@ -1,13 +1,14 @@
 import math
 import numpy as np
 
+
 # Covariance for EKF simulation
 Q = np.diag([
     0.2,  # variance of location on x-axis
     0.2,  # variance of location on y-axis
-    np.deg2rad(3.0)  # variance of yaw angle
+    math.radians(3.0)  # variance of yaw angle
 ]) ** 2  # predict state covariance
-R = np.diag([0.2, 0.2,np.deg2rad(3.0)]) ** 2  # Observation x,y position covariance
+R = np.diag([0.2, 0.2,math.radians(3.0)]) ** 2  # Observation x,y position covariance
 
 DT = 0.1  # time tick [s]
 
