@@ -4,5 +4,6 @@
         "/home/shaw/catkin_ws/devel/lib/python2.7/dist-packages",
         "/opt/ros/melodic/lib/python2.7/dist-packages"
     ],
-    "python.formatting.provider": "yapf"
+    "python.formatting.provider": "yapf",
+    "cmake.configureOnOpen": false
 }

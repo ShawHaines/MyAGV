@@ -6,7 +6,7 @@ import tf
 
 
 def onRecievePose(data):
-    broadcaster=tf.TransformBroadcaster()
+    
     # rospy.loginfo(data)
     position=data.pose[1].position
     orientation=data.pose[1].orientation
@@ -18,5 +18,6 @@ def onRecievePose(data):
 
 if __name__ == "__main__":
     rospy.init_node("tf_subscriber",anonymous=True)
+    broadcaster=tf.TransformBroadcaster()
     rospy.Subscriber("/gazebo/model_states",gazebo_msgs.msg.ModelStates,callback=onRecievePose)
     rospy.spin()

@@ -7,8 +7,9 @@ import geometry_msgs.msg
 command = {
     "vx":0.0,
     "vw":0.0,
-    "step":0.1,
-    "vmax":3.0
+    "step":0.01,
+    "vmax":3.0,
+    "wmax":3.0
 }
 def limitNum(num,minNum,maxNum):
     if num > maxNum:
@@ -28,8 +29,8 @@ def cmd_reset_func(cmd):
 KEY_MAP_TABLE={
     'w' : cmd_num_func(command,"vx", command["step"],-command["vmax"],command["vmax"]),
     's' : cmd_num_func(command,"vx",-command["step"],-command["vmax"],command["vmax"]),
-    'a' : cmd_num_func(command,"vw", command["step"],-command["vmax"],command["vmax"]),
-    'd' : cmd_num_func(command,"vw",-command["step"],-command["vmax"],command["vmax"]),
+    'a' : cmd_num_func(command,"vw", command["step"],-command["wmax"],command["wmax"]),
+    'd' : cmd_num_func(command,"vw",-command["step"],-command["wmax"],command["wmax"]),
     Key.space : cmd_reset_func(command)
 }
 
