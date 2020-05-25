@@ -1,6 +1,7 @@
 import math
 import numpy as np
-
+import rospy
+from nav_msgs.msg import OccupancyGrid
 
 class Mapping():
     def __init__(self,xw,yw,xyreso):
@@ -21,8 +22,6 @@ class Mapping():
         return self.pmap
 
 def main():
-    import rospy
-    from nav_msgs.msg import OccupancyGrid
     """
     Example usage
     """
