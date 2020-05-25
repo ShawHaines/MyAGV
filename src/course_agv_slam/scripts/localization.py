@@ -74,39 +74,42 @@ class Localization(OdometryLocation):
         # oy = (ty*self.map.info.resolution+self.map.info.origin.position.y)*1.0
         # self.obstacle = np.vstack((ox,oy)).transpose()
         print("obstacle list:\n{}".format(self.obstacle))
-        self.obstacle_r = self.map.info.resolution/2
+        # a conservative estimation.
+        self.obstacle_r = self.map.info.resolution
         print("debug: update map obstacle success! ")
 
     def laserCallback(self,msg):
         # TODO
-        print('------seq:  ',msg.header.seq)
-        self.calc_odometry(msg)
-        # process once every 5 laser scan because laser fps is too high
-        self.laser_count += 1
-        if self.laser_count < self.laser_inteval:
-            return
-        self.laser_count = 0
+        # print('------seq:  ',msg.header.seq)
+        # self.calc_odometry(msg)
+        # # process once every 5 laser scan because laser fps is too high
+        # self.laser_count += 1
+        # if self.laser_count < self.laser_inteval:
+        #     return
+        # self.laser_count = 0
+        self.laser_pub.publish(self.laserEstimation(msg,self.xEst))
         pass
     
     def laserEstimation(self,msg,x):
         '''
-        Simulate the laser data from the estimated position.
+        Simulate the laser data from the estimated position x. msg is the reference laser.
         '''
         # laser is defined by the laser subscription
-        data=self.laser
-        data.seq+=1
-        data.ranges=list(np.zeros_like(self.laser.ranges,dtype=float)+self.inf)
+        data=msg
+        data.header.seq+=1
+        data.ranges=list(np.zeros_like(msg.ranges,dtype=float)+self.inf)
         for each in self.obstacle:
-            # points from xEst to x
-            dr=each-np.array(self.xEst[0:2])
+            # points from x to each
+            dr=each-np.array(x[0:2,0])
             distance=np.linalg.norm(dr)
-            dtheta=math.atan(self.obstacle_r,distance)
-            theta=math.atan2(dr[1],dr[0])-self.xEst[2]
+            dtheta=math.atan(self.obstacle_r/distance)
+            theta=math.atan2(dr[1],dr[0])-x[2,0]
             angleRange=[theta-dtheta,theta+dtheta]
             # the index of laser covered
-            indexRange=(np.array(angleRange)+np.pi)/self.laser.angle_increment
-            for index in range(math.floor(indexRange[0]),math.ceil(indexRange[1])+1):
-                if index>indexRange[0] and x<indexRange[1]:
+            indexRange=(np.array(angleRange)+np.pi)/msg.angle_increment
+            # print(indexRange)
+            for index in range(int(indexRange[0]),int(math.ceil(indexRange[1])+1)):
+                if index>indexRange[0] and index<indexRange[1]:
                     if data.ranges[index]>distance:
                         data.ranges[index]=distance
         return data
@@ -130,7 +133,7 @@ class Localization(OdometryLocation):
             self.isFirstScan = False
             return np.identity(3)
         self.src_pc = self.laserToNumpy(msg)
-        transform_acc = self.icp.process(self.tar_pc,self.src_pc)
+        # transform_acc = self.icp.process(self.tar_pc,self.src_pc)
         self.tar_pc = self.laserToNumpy(msg)
         return transform_acc
     def fourConnected(self,pair):
