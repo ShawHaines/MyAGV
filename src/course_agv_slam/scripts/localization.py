@@ -14,28 +14,27 @@ import sys
 import copy
 
 class SubICP(ICPBase):
+    '''
+    The management of firstScan etc. are moved to the Localization 
+    object to handle.
+    '''
     def __init__(self):
         super(SubICP,self).__init__()
-        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=1)
     
     def laserCallback(self,msg):
         '''
         laser ICP odometry.
         '''
-        print('------seq:  ',msg.header.seq)
-        if self.isFirstScan:
-            self.tar_pc = self.laserToNumpy(self.laserEstimation(msg,self.xEst))
-            # print("ddddddddddddddddddd ",self.tar_pc - self.laserToNumpy(msg))
-            self.isFirstScan = False
-            return
-        
-        # process once every 5 laser scan because laser fps is too high
-        self.laser_count += 1
-        if self.laser_count < self.laser_inteval:
-            return
-            
-        self.laser_count = 0
-        transform_acc=self.calc_odometry(msg)
+        time_0 = rospy.Time.now()
+        self.src_pc = self.laserToNumpy(msg)
+        # print('input cnt: ',self.src_pc.shape[1])
+
+        T=self.processICP(self.src_pc,self.tar_pc)
+        self.tar_pc = np.copy(self.src_pc) # moving the target to src
+
+        self.publishResult(T)
+        duration=rospy.Time.now()-time_0
+        print("time_cost: {} s".format(duration.to_sec()))
         pass
 
 
@@ -54,11 +53,12 @@ class Localization(OdometryLocation):
         self.ekf = EKF()
         
         # State Vector [x y yaw]'
-        self.xOdom = np.zeros((3,1))
-        self.xEst = np.zeros((3,1))
+        self.xOdom = np.zeros(3)
+        self.xEst = np.zeros(3)
+        # What exactly is this PEst?
         self.PEst = np.eye(3) # the same with identity
                 
-        # map observation
+        # map obstacle
         self.obstacle = []
         # radius
         self.obstacle_r = 10
@@ -89,7 +89,7 @@ class Localization(OdometryLocation):
         tx,ty = np.nonzero((self.map.data > 20)|(self.map.data < -0.5))
         obstacleList=[]
         for (x,y) in zip(tx,ty):
-            # filter out the 4-connected ones.
+            # filter out the 4-connected ones. Extract only the edges.
             if not self.fourConnected((x,y)):
                 obstacleList.append((x,y))
         originPos=np.array([self.map.info.origin.position.x,self.map.info.origin.position.y])
@@ -110,18 +110,29 @@ class Localization(OdometryLocation):
         print('------seq:  ',msg.header.seq)
         if self.isFirstScan:
             self.tar_pc = self.laserToNumpy(self.laserEstimation(msg,self.xEst))
+            self.icp.tar_pc=msg
             # print("ddddddddddddddddddd ",self.tar_pc - self.laserToNumpy(msg))
             self.isFirstScan = False
             return
         
-        # process once every 5 laser scan because laser fps is too high
+        # Update once every 5 laser scan because laser fps is too high
         self.laser_count += 1
         if self.laser_count < self.laser_inteval:
+            print("skipped.")
             return
-            
+        
+        # Updating process
         self.laser_count = 0
-        transform_acc=self.calc_odometry(msg)
-        self.laser_pub.publish(self.laserEstimation(msg,self.xEst))
+        # laser callback is manually fed by its owner class.
+        state0=np.copy(self.icp.sensor_sta)
+        self.icp.laserCallback(msg)
+        # relative state.
+        u=np.array(self.icp.sensor_sta)-state0
+        T=self.icp.processICP(self.laserEstimation(msg,self.xEst),self.tar_pc)
+        # z is the absolute states.
+        z=self.T2u(T)
+        self.ekf.estimate(self.xEst,self.PEst,z,u)
+        # self.laser_pub.publish(self.laserEstimation(msg,self.xEst))
         pass
     
     def laserEstimation(self,msg,x):
@@ -135,10 +146,10 @@ class Localization(OdometryLocation):
         data.ranges=list(np.zeros_like(msg.ranges,dtype=float)+self.inf)
         for each in self.obstacle:
             # points from x to each
-            dr=each-np.array(x[0:2,0])
+            dr=each-np.array(x[0:2])
             distance=np.linalg.norm(dr)
             dtheta=math.asin(self.obstacle_r/distance)
-            theta=math.atan2(dr[1],dr[0])-x[2,0]
+            theta=math.atan2(dr[1],dr[0])-x[2]
             angleRange=[theta-dtheta,theta+dtheta]
             # the index of laser covered
             indexRange=(np.array(angleRange)+np.pi)/msg.angle_increment
@@ -159,15 +170,6 @@ class Localization(OdometryLocation):
         # TODO
         return transform_acc
 
-    def calc_odometry(self,msg):
-        '''
-        get the relative odometry from icp.
-        '''
-        self.src_pc = self.laserToNumpy(msg)
-        transform_acc=self.processICP(self.src_pc,self.tar_pc)
-        # always avoid shallow copy.
-        self.tar_pc = np.copy(self.src_pc)
-        return transform_acc
     def fourConnected(self,pair):
         pair=np.array(pair)
         for dr in self.directions:
@@ -178,7 +180,14 @@ class Localization(OdometryLocation):
             if self.map.data[tuple(newPair)]>-0.5 and self.map.data[tuple(newPair)]<20:
                 return False
         return True
-
+    
+    def T2u(self,t):
+        dw = math.atan2(t[1,0],t[0,0])
+        u = np.array([[t[0,2],t[1,2],dw]])
+        # .T can be viewed as transpose in 2 dimentional matrix.
+        # but here u is only 1-D..
+        # return u.T
+        return u
 
 def main():
     rospy.init_node('localization_node')
@@ -186,8 +195,8 @@ def main():
     rospy.spin()
     pass
 
-def test():
-    pass
+# def test():
+#     pass
 
 if __name__ == '__main__':
     main()

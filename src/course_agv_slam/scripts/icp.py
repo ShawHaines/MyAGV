@@ -115,12 +115,15 @@ class ICPBase(OdometryLocation):
         
         self.estimatedPose=Pose(position=Point(0,0,0),orientation=Quaternion(0,0,0,1))
     
-    def processICP(self,src,tar):
+    def processICP(self,source,target):
         '''
         Process the fitting between self.src_pc and tar_pc.
         Returns T the transformation matrix.
+        src and tar won't be accidentally changed.
         '''
         # init some variables
+        src=np.copy(source)
+        tar=np.copy(target)
         try:
             rospy.wait_for_service("/course_agv/odometry",timeout=0.1)
             newPose=rospy.ServiceProxy("/course_agv/odometry",Odometry_srv)()
@@ -153,7 +156,7 @@ class ICPBase(OdometryLocation):
         iterations=0
         temp=np.copy(tar)
         lastDeviation=0
-
+        
         # don't move src_pc, adjust tar_pc to fit src.
         for _ in range(self.max_iter): # I haven't seen this grammar before...
             # transform tar_pc:
@@ -172,7 +175,7 @@ class ICPBase(OdometryLocation):
                 temp[:,i]=tar[:,neighbour.tar_indices[i]]
             # FIXME: again the SHALLOW COPY!
             tar=np.copy(temp)
-            rotation,translation=self.getTransform()
+            rotation,translation=self.getTransform(src,tar)
             
             print("d= {} (iterations{})".format(deviation,iterations))
         
@@ -183,6 +186,9 @@ class ICPBase(OdometryLocation):
         # because of the relative relation between frames, R and T should reverse
         T[0:2,0:2]=np.transpose(rotation)
         T[0:2,2]=-translation
+        # error dealing.
+        if np.any(np.isnan(T)):
+            return np.identity(3)
         return T
 
     def findNearest(self,src,tar):
@@ -217,11 +223,8 @@ class ICPBase(OdometryLocation):
         # print("\tdistances:{}".format(neighbour.distances))
         return neighbour
 
-    def getTransform(self):
+    def getTransform(self,src,tar):
         # be very careful that the arguments are passed in as references.
-        src=self.src_pc
-        tar=self.tar_pc
-        # those are references, or alias
         if np.size(src,1)!= np.size(tar,1):
             print("error in length!")
             # skipping

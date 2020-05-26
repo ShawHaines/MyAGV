@@ -39,7 +39,7 @@ class EKF():
         u = [ox,oy,ow]T
         """
         ## TODO
-        return G, Fx,
+        return (G, Fx)
 
 
     def calc_landmark_position(self, x, z):
@@ -75,6 +75,9 @@ class EKF():
         return min_id
 
     def jacob_h(self, q, delta, x, i):
+        '''
+        the Jacobian of observation model.
+        '''
         ## TODO
         return H
 
