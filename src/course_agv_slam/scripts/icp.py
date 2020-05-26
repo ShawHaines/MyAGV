@@ -69,8 +69,8 @@ class OdometryLocation(object):
         # odom topic publish
         # FIXME: the code can be more concise...
         odom = Odometry(header=Header(0,rospy.Time.now(),"world_base"))
-        odom.header.stamp = rospy.Time.now()
-        odom.header.frame_id = "world_base"
+        # odom.header.stamp = rospy.Time.now()
+        # odom.header.frame_id = "world_base"
 
         odom.pose.pose.position.x = s[0]
         odom.pose.pose.position.y = s[1]

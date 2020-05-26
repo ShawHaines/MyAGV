@@ -168,7 +168,8 @@ class Localization(OdometryLocation):
         Return: 3*3 matrix T.
         '''
         # TODO
-        return transform_acc
+        # return transform_acc
+        pass
 
     def fourConnected(self,pair):
         pair=np.array(pair)
