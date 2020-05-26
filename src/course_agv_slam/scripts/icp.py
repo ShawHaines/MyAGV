@@ -104,7 +104,7 @@ class ICPBase(OdometryLocation):
         super(ICPBase,self).__init__()
         self.laser_count  = 0
         # process once every 5 laser frames
-        self.laser_inteval= 1
+        self.laser_inteval= 5
         
         # max iterations
         self.max_iter = int(rospy.get_param('/icp/max_iter',10))
