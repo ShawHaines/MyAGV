@@ -98,51 +98,24 @@ class OdometryLocation(object):
         dy = a[1] - b[1]
         return math.hypot(dx,dy)
 
-class ICP(OdometryLocation):
+class ICPBase(OdometryLocation):
     inf=1e6
     def __init__(self):
-        super(ICP,self).__init__()
+        super(ICPBase,self).__init__()
         self.laser_count  = 0
         # process once every 5 laser frames
         self.laser_inteval= 1
         
         # max iterations
-        self.max_iter = int(rospy.get_param('/icp/max_iter',30))
+        self.max_iter = int(rospy.get_param('/icp/max_iter',10))
         # distance threshold for filter the matching points
-        self.dis_th = float(rospy.get_param('/icp/dis_th',5))
+        self.dis_th = float(rospy.get_param('/icp/dis_th',0.5))
         # tolerance to stop icp
-        self.tolerance = float(rospy.get_param('/icp/tolerance',0))
+        self.tolerance = float(rospy.get_param('/icp/tolerance',10))
         
         self.estimatedPose=Pose(position=Point(0,0,0),orientation=Quaternion(0,0,0,1))
-
-        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=1)
     
-    def laserCallback(self,msg):
-        # process and fit laser pointcloud data.
-        print('------seq:  ',msg.header.seq)
-        if not np.any(self.tar_pc):
-            self.tar_pc = self.laserToNumpy(msg)
-            # self.isFirstScan = False
-            self.laser_count = 0
-            return
-        
-        # process once every 5 laser scan because laser fps is too high
-        self.laser_count += 1
-        if self.laser_count < self.laser_inteval:
-            return
-        self.laser_count = 0
-        time_0 = rospy.Time.now()
-        self.src_pc = self.laserToNumpy(msg)
-        # print('input cnt: ',self.src_pc.shape[1])
-
-        T=self.processICP()
-        self.tar_pc = np.copy(self.src_pc) # moving the target to src
-
-        self.publishResult(T)
-        duration=rospy.Time.now()-time_0
-        print("time_cost: {} s".format(duration.to_sec()))
-
-    def processICP(self):
+    def processICP(self,src,tar):
         '''
         Process the fitting between self.src_pc and tar_pc.
         Returns T the transformation matrix.
@@ -178,27 +151,27 @@ class ICP(OdometryLocation):
         rotation=np.transpose(rotation)
         
         iterations=0
-        temp=np.copy(self.tar_pc)
+        temp=np.copy(tar)
         lastDeviation=0
 
         # don't move src_pc, adjust tar_pc to fit src.
         for _ in range(self.max_iter): # I haven't seen this grammar before...
             # transform tar_pc:
-            for i in range(np.size(self.tar_pc,1)):
+            for i in range(np.size(tar,1)):
                 # FIXME: You CAN'T change the target!
-                temp[:,i]=np.dot(rotation,self.tar_pc[:,i])+translation
+                temp[:,i]=np.dot(rotation,tar[:,i])+translation
             iterations += 1
 
-            neighbour=self.findNearest(self.src_pc,temp)
+            neighbour=self.findNearest(src,temp)
             deviation=np.sum(neighbour.distances)
             if lastDeviation==deviation or deviation<self.tolerance:
                 break
             lastDeviation=deviation
             # change the pairing rule
-            for i in range(np.size(self.tar_pc,1)):
-                temp[:,i]=self.tar_pc[:,neighbour.tar_indices[i]]
+            for i in range(np.size(tar,1)):
+                temp[:,i]=tar[:,neighbour.tar_indices[i]]
             # FIXME: again the SHALLOW COPY!
-            self.tar_pc=np.copy(temp)
+            tar=np.copy(temp)
             rotation,translation=self.getTransform()
             
             print("d= {} (iterations{})".format(deviation,iterations))
@@ -271,6 +244,39 @@ class ICP(OdometryLocation):
         # print("rotation:{}".format(rotation))
         # print("translation:{}".format(translation))
         return (rotation,translation)
+
+class ICP(ICPBase):
+    def __init__(self):
+        super(ICP,self).__init__()
+
+        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=1)
+    
+    def laserCallback(self,msg):
+        # process and fit laser pointcloud data. 
+        # callback is a little messy.
+        print('------seq:  ',msg.header.seq)
+        if not np.any(self.tar_pc):
+            self.tar_pc = self.laserToNumpy(msg)
+            # self.isFirstScan = False
+            self.laser_count = 0
+            return
+        
+        # process once every 5 laser scan because laser fps is too high
+        self.laser_count += 1
+        if self.laser_count < self.laser_inteval:
+            return
+        self.laser_count = 0
+        time_0 = rospy.Time.now()
+        self.src_pc = self.laserToNumpy(msg)
+        # print('input cnt: ',self.src_pc.shape[1])
+
+        T=self.processICP(self.src_pc,self.tar_pc)
+        self.tar_pc = np.copy(self.src_pc) # moving the target to src
+
+        self.publishResult(T)
+        duration=rospy.Time.now()-time_0
+        print("time_cost: {} s".format(duration.to_sec()))
+        pass
 
 def main():
     rospy.init_node('icp_node')
