@@ -117,9 +117,9 @@ class ICPBase(OdometryLocation):
     
     def processICP(self,source,target):
         '''
-        Process the fitting between self.src_pc and tar_pc.
+        Process the fitting between source and target.
         Returns T the transformation matrix.
-        src and tar won't be accidentally changed.
+        source and target is guarenteed not to be accidentally changed.
         '''
         # init some variables
         src=np.copy(source)
@@ -252,7 +252,7 @@ class ICP(ICPBase):
     def __init__(self):
         super(ICP,self).__init__()
 
-        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=1)
+        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=self.laser_inteval)
     
     def laserCallback(self,msg):
         # process and fit laser pointcloud data. 

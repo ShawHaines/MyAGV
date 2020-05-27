@@ -42,6 +42,8 @@ class Localization(OdometryLocation):
     # direction: up, down, left, right
     directions=np.array([(0,1),(0,-1),(-1,0),(1,0)])
     inf=1e6
+
+
     def __init__(self):
         
         super(Localization,self).__init__()
@@ -51,11 +53,11 @@ class Localization(OdometryLocation):
 
         self.icp = SubICP()
         self.ekf = EKF()
-        
         # State Vector [x y yaw]'
         self.xOdom = np.zeros(3)
         self.xEst = np.zeros(3)
         # What exactly is this PEst?
+        # P is the covariance.
         self.PEst = np.eye(3) # the same with identity
                 
         # map obstacle
@@ -71,6 +73,7 @@ class Localization(OdometryLocation):
         # self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
         self.laser_pub = rospy.Publisher('/target_laser',LaserScan,queue_size=3)
         self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
+        
         
     def updateMap(self):
         print("debug: try update map obstacle")
@@ -128,10 +131,15 @@ class Localization(OdometryLocation):
         self.icp.laserCallback(msg)
         # relative state.
         u=np.array(self.icp.sensor_sta)-state0
-        T=self.icp.processICP(self.laserEstimation(msg,self.xEst),self.tar_pc)
+        
         # z is the absolute states.
+        T=self.icp.processICP(self.laserToNumpy(msg),self.tar_pc)
         z=self.T2u(T)
-        self.ekf.estimate(self.xEst,self.PEst,z,u)
+        # xEst is both predicted and updated in the ekf.
+        self.xEst=self.ekf.predict(self.xEst,u)
+        T=self.icp.processICP(self.laserToNumpy(self.laserEstimation(msg,self.xEst)),self.tar_pc)
+        virtualZ=self.T2u(T)
+        self.xEst,self.PEst=self.ekf.update(self.xEst,self.PEst,z,virtualZ)
         # self.laser_pub.publish(self.laserEstimation(msg,self.xEst))
         pass
     

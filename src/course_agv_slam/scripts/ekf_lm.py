@@ -41,6 +41,14 @@ class EKF():
         ## TODO
         return (G, Fx)
 
+    def jacob_h(self, q, delta, x, i):
+        '''
+        the Jacobian of observation model.
+        '''
+        ## TODO
+        return H
+
+
 
     def calc_landmark_position(self, x, z):
         zp = np.zeros((2, 1))
@@ -74,12 +82,6 @@ class EKF():
 
         return min_id
 
-    def jacob_h(self, q, delta, x, i):
-        '''
-        the Jacobian of observation model.
-        '''
-        ## TODO
-        return H
-
+    
     def pi_2_pi(self, angle):
         return (angle + math.pi) % (2 * math.pi) - math.pi
