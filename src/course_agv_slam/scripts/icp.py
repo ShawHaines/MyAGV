@@ -14,32 +14,34 @@ def toArray(p):
     return np.array([p.x,p.y,p.z])
 def toList(q):
     return [q.x,q.y,q.z,q.w]
+
 class NeighBor:
     def __init__(self):
         self.distances = []
         self.src_indices = []
         self.tar_indices = []
 
-class OdometryLocation(object):
-    def __init__(self):
-        # robot init states
-        self.robot_x = float(rospy.get_param('/icp/robot_x',0))
-        self.robot_y = float(rospy.get_param('/icp/robot_y',0))
-        self.robot_theta = float(rospy.get_param('/icp/robot_theta',0))     
-        
-        # sensor's estimation for current state = robot_x_y_theta
-        self.sensor_sta = [self.robot_x,self.robot_y,self.robot_theta]
-        # if is the first scan, set as the map/target
-        self.isFirstScan = True
-        # src point cloud matrix
-        self.src_pc=None
-        # target point cloud matrix
-        self.tar_pc=None
-        self.odom_pub = rospy.Publisher('icp_odom',Odometry,queue_size=1)
-        self.odom_broadcaster = tf.TransformBroadcaster()
-        pass
+class Localization(object):
+    def __init__(self,nodeName):
+        self.nodeName=nodeName
+        # State Vector [x y yaw].T, column vector.
+        self.xEst=np.zeros((3,1))
+        self.odom_pub = rospy.Publisher(nodeName,Odometry,queue_size=1)
+        self.odom_broadcaster=tf.TransformBroadcaster()
 
-    def publishResult(self,T):
+    def publishResult(self):
+        self.odom_pub.publish(self.statusToOdometry(self.xEst))
+
+        # flatten out
+        s=np.array(self.xEst).reshape(-1)
+        print("sensor-global  : {}".format(s))
+
+        # tf broadcast
+        q = tf.transformations.quaternion_from_euler(0,0,s[2])
+        self.odom_broadcaster.sendTransform((s[0],s[1],0.001),(q[0],q[1],q[2],q[3]),
+                            rospy.Time.now(),self.nodeName,"world_base")
+
+    def translateResult(self,T):
         # what exactly is this T? T is a affine transformation matrix of 1 higher order.
         print("T: {}".format(T))
         delta_yaw = math.atan2(T[1,0],T[0,0])
@@ -47,61 +49,68 @@ class OdometryLocation(object):
         print("sensor-delta-xyt:[{},{},{}]".format(T[0,2],T[1,2],delta_yaw))
         # improved readability
         # rotation=T[0:2,0:2]
-        translation=T[0:2,2]
-        x,y,theta=self.sensor_sta
+        translation=T[0:2,2].reshape(2,1)
+        x,y,theta=self.xEst
         theta+=delta_yaw
         # the position of theta+=delta_yaw needs consideration.
         eulerMatrix=tf.transformations.euler_matrix(0,0,theta)[0:2,0:2]
         x,y=np.array([x,y])+np.dot(eulerMatrix,translation)
-        self.sensor_sta=[x,y,theta]
+        self.xEst=np.array([x,y,theta])
+        
         # s = self.sensor_sta
         # self.sensor_sta[0] = s[0] + math.cos(s[2])*T[0,2] - math.sin(s[2])*T[1,2]
         # self.sensor_sta[1] = s[1] + math.sin(s[2])*T[0,2] + math.cos(s[2])*T[1,2]
         # self.sensor_sta[2] = s[2] + delta_yaw
-        print("sensor-global: {}".format(self.sensor_sta))
-
-        # tf broadcast
-        s = self.sensor_sta
-        q = tf.transformations.quaternion_from_euler(0,0,self.sensor_sta[2])
-        self.odom_broadcaster.sendTransform((s[0],s[1],0.001),(q[0],q[1],q[2],q[3]),
-                            rospy.Time.now(),"icp_odom","world_base")
-
+    
+    def statusToOdometry(self,sensorStatus):
+        # flatten out
+        s=np.array(sensorStatus).reshape(-1)
+        q = tf.transformations.quaternion_from_euler(0,0,s[2])
         # odom topic publish
-        # FIXME: the code can be more concise...
         odom = Odometry(header=Header(0,rospy.Time.now(),"world_base"))
         # odom.header.stamp = rospy.Time.now()
         # odom.header.frame_id = "world_base"
 
-        odom.pose.pose.position.x = s[0]
-        odom.pose.pose.position.y = s[1]
-        odom.pose.pose.position.z = 0
-        odom.pose.pose.orientation.x = q[0]
-        odom.pose.pose.orientation.y = q[1]
-        odom.pose.pose.orientation.z = q[2]
-        odom.pose.pose.orientation.w = q[3]
+        # odom.pose.pose.position.x = s[0]
+        # odom.pose.pose.position.y = s[1]
+        # odom.pose.pose.position.z = 0
+        odom.pose.pose.position=Point(s[0],s[1],0)
+        # odom.pose.pose.orientation.x = q[0]
+        # odom.pose.pose.orientation.y = q[1]
+        # odom.pose.pose.orientation.z = q[2]
+        # odom.pose.pose.orientation.w = q[3]
+        odom.pose.pose.orientation=Quaternion(q[0],q[1],q[2],q[3])
 
-        self.odom_pub.publish(odom)
-        
-    def laserToNumpy(self,msg):
-        # the x,y coordinates are in robot's frame?
-        total_num = len(msg.ranges)
-        # pc = np.ones([3,total_num])
-        range_l = np.array(msg.ranges)
-        angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)
-        # ufunc, high performance
-        pc = np.vstack((np.multiply(np.cos(angle_l),range_l),np.multiply(np.sin(angle_l),range_l)))
-        # print("Numpy pc:{}".format(pc))
-        return pc
+        return odom
 
     def calcDist(self,a,b):
         dx = a[0] - b[0]
         dy = a[1] - b[1]
         return math.hypot(dx,dy)
 
-class ICPBase(OdometryLocation):
-    inf=1e6
-    def __init__(self):
-        super(ICPBase,self).__init__()
+class ICPBase(Localization):
+    def __init__(self,nodeName="icp_odom"):
+
+        self.inf=1e6
+        
+        super(ICPBase,self).__init__(nodeName)
+
+        # robot init states
+        self.robot_x = float(rospy.get_param('/icp/robot_x',0))
+        self.robot_y = float(rospy.get_param('/icp/robot_y',0))
+        self.robot_theta = float(rospy.get_param('/icp/robot_theta',0))     
+        
+        # sensor's estimation for current state = robot_x_y_theta, overrides Localization.
+        self.xEst = np.array([[self.robot_x,self.robot_y,self.robot_theta]]).T
+        # if is the first scan, set as the map/target
+        self.isFirstScan = True
+        # src point cloud matrix
+        self.src_pc=None
+        # target point cloud matrix
+        self.tar_pc=None
+
+        
+
         self.laser_count  = 0
         # process once every 5 laser frames
         self.laser_inteval= 5
@@ -112,9 +121,10 @@ class ICPBase(OdometryLocation):
         self.dis_th = float(rospy.get_param('/icp/dis_th',0.5))
         # tolerance to stop icp
         self.tolerance = float(rospy.get_param('/icp/tolerance',10))
-        
+
+        # for wheel odometry.
         self.estimatedPose=Pose(position=Point(0,0,0),orientation=Quaternion(0,0,0,1))
-    
+
     def processICP(self,source,target):
         '''
         Process the fitting between source and target.
@@ -247,10 +257,21 @@ class ICPBase(OdometryLocation):
         # print("rotation:{}".format(rotation))
         # print("translation:{}".format(translation))
         return (rotation,translation)
+       
+    def laserToNumpy(self,msg):
+        # the x,y coordinates are in robot's frame?
+        total_num = len(msg.ranges)
+        # pc = np.ones([3,total_num])
+        range_l = np.array(msg.ranges)
+        angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)
+        # ufunc, high performance
+        pc = np.vstack((np.multiply(np.cos(angle_l),range_l),np.multiply(np.sin(angle_l),range_l)))
+        # print("Numpy pc:{}".format(pc))
+        return pc
 
 class ICP(ICPBase):
-    def __init__(self):
-        super(ICP,self).__init__()
+    def __init__(self,nodeName="icp_odom"):
+        super(ICP,self).__init__(nodeName)
 
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=self.laser_inteval)
     
@@ -275,8 +296,8 @@ class ICP(ICPBase):
 
         T=self.processICP(self.src_pc,self.tar_pc)
         self.tar_pc = np.copy(self.src_pc) # moving the target to src
-
-        self.publishResult(T)
+        self.translateResult(T)
+        self.publishResult()
         duration=rospy.Time.now()-time_0
         print("time_cost: {} s".format(duration.to_sec()))
         pass
