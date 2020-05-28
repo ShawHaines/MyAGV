@@ -9,6 +9,7 @@ from std_msgs.msg import Header
 import numpy as np
 import math
 from course_agv_slam.srv import Odometry_srv
+import sys
 
 def toArray(p):
     return np.array([p.x,p.y,p.z])
@@ -120,43 +121,49 @@ class ICPBase(Localization):
         # distance threshold for filter the matching points
         self.dis_th = float(rospy.get_param('/icp/dis_th',0.5))
         # tolerance to stop icp
-        self.tolerance = float(rospy.get_param('/icp/tolerance',10))
+        self.tolerance = float(rospy.get_param('/icp/tolerance',0))
 
         # for wheel odometry.
         self.estimatedPose=Pose(position=Point(0,0,0),orientation=Quaternion(0,0,0,1))
 
-    def processICP(self,source,target):
+    def processICP(self,source,target,initialT=None):
         '''
         Process the fitting between source and target.
         Returns T the transformation matrix.
         source and target is guarenteed not to be accidentally changed.
+        initial argument pass in the initial value of T.
+        If set to None, use Wheel odometry reference
         '''
         # init some variables
         src=np.copy(source)
         tar=np.copy(target)
-        try:
-            rospy.wait_for_service("/course_agv/odometry",timeout=0.1)
-            newPose=rospy.ServiceProxy("/course_agv/odometry",Odometry_srv)()
-            newPose=newPose.pose
-            # print("New Pose(Wheel):{}".format(newPose))
-            # print("type: {}".format(type(newPose)))
-            # print("Original Pose(Wheel):{}".format(self.estimatedPose))
-            # print("type: {}".format(type(self.estimatedPose)))
-            translation=toArray(newPose.position)-toArray(self.estimatedPose.position)
-            translation=translation[0:2]
-            newEuler=tf.transformations.euler_from_quaternion(toList(newPose.orientation))
-            oldEuler=tf.transformations.euler_from_quaternion(toList(self.estimatedPose.orientation))
-            rotation=tf.transformations.euler_matrix(0,0,newEuler[2]-oldEuler[2])[0:2,0:2]
-            # change to self frame
-            
-            translation=np.dot(tf.transformations.euler_matrix
-                    (oldEuler[0],oldEuler[1],-oldEuler[2])[0:2,0:2],translation)
-            self.estimatedPose=newPose
-        except rospy.ROSException, e:
-            print("wheel odometry failed: {}".format(e))
-            # no reference from wheel.
-            rotation = np.identity(2)
-            translation=np.zeros(2)
+        if not initialT:
+            try:
+                rospy.wait_for_service("/course_agv/odometry",timeout=0.1)
+                newPose=rospy.ServiceProxy("/course_agv/odometry",Odometry_srv)()
+                newPose=newPose.pose
+                # print("New Pose(Wheel):{}".format(newPose))
+                # print("type: {}".format(type(newPose)))
+                # print("Original Pose(Wheel):{}".format(self.estimatedPose))
+                # print("type: {}".format(type(self.estimatedPose)))
+                translation=toArray(newPose.position)-toArray(self.estimatedPose.position)
+                translation=translation[0:2]
+                newEuler=tf.transformations.euler_from_quaternion(toList(newPose.orientation))
+                oldEuler=tf.transformations.euler_from_quaternion(toList(self.estimatedPose.orientation))
+                rotation=tf.transformations.euler_matrix(0,0,newEuler[2]-oldEuler[2])[0:2,0:2]
+                # change to self frame
+                
+                translation=np.dot(tf.transformations.euler_matrix
+                        (oldEuler[0],oldEuler[1],-oldEuler[2])[0:2,0:2],translation)
+                self.estimatedPose=newPose
+            except rospy.ROSException, e:
+                print("wheel odometry failed: {}".format(e))
+                # fallback to no reference.
+                rotation = np.identity(2)
+                translation=np.zeros(2)
+        else:
+            rotation = initialT[0:2,0:2]
+            translation=initialT[0:2,2]
 
         print("initial rotation:\n{} \ntranslation:{}".format(rotation,translation))
         # FIXME: learn about relativity! the laser in the frame moves opposite
@@ -170,13 +177,21 @@ class ICPBase(Localization):
         # don't move src_pc, adjust tar_pc to fit src.
         for _ in range(self.max_iter): # I haven't seen this grammar before...
             # transform tar_pc:
+            iterations += 1
             for i in range(np.size(tar,1)):
                 # FIXME: You CAN'T change the target!
                 temp[:,i]=np.dot(rotation,tar[:,i])+translation
-            iterations += 1
 
             neighbour=self.findNearest(src,temp)
             deviation=np.sum(neighbour.distances)
+            if deviation>10:
+                with open("./abc",'w') as f:
+                    f.write("neighbour.tar_indices=\n{}\n".format(neighbour.tar_indices))
+                    f.write("src_pc=\n{}\n".format(self.src_pc))
+                    f.write("tar_pc=\n{}\n".format(self.tar_pc))
+                    f.write("temp=\n{}\n".format(temp))
+                    f.write("d={}\n".format(deviation))
+                sys.exit(1)
             if lastDeviation==deviation or deviation<self.tolerance:
                 break
             lastDeviation=deviation
@@ -245,13 +260,19 @@ class ICPBase(Localization):
         
         # print("srcCenter:{}".format(srcCenter))
         # print("tarCenter:{}".format(tarCenter))
-        # TODO: There's still improving space.
-        q_all=[np.dot(np.reshape(tar[:,i]-tarCenter,(2,1)),np.reshape(src[:,i]-srcCenter,(1,2))) for i in range(length)]
-        # print(q_all)
-        W=np.sum(q_all,axis=0)
+        
+        # # TODO: There's still improving space.
+        # q_all=[np.dot(np.reshape(tar[:,i]-tarCenter,(2,1)),np.reshape(src[:,i]-srcCenter,(1,2))) for i in range(length)]
+        # # print(q_all)
+        # W=np.sum(q_all,axis=0)
+
+        # ELEGANT!
+        srcPrime=src-srcCenter.reshape((2,1))
+        tarPrime=tar-tarCenter.reshape((2,1))
+        W=np.dot(tarPrime,srcPrime.T)
         # print("W={}".format(W))
         U,S,V=np.linalg.svd(W)
-        # FIXME: notice the difference of svd decomposing declaration!
+        # FIXME: notice the difference of svd decomposing declaration! W=U*diag(S)*V
         rotation=np.transpose(np.dot(U,V))
         translation=srcCenter-np.dot(rotation,tarCenter)
         # print("rotation:{}".format(rotation))

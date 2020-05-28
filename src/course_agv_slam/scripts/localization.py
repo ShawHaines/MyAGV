@@ -41,7 +41,7 @@ class SubICP(ICPBase):
 class ICPLocalization(Localization,EKF):
     # direction: up, down, left, right
     directions=np.array([(0,1),(0,-1),(-1,0),(1,0)])
-    inf=1e6
+    inf=1e2
 
 
     def __init__(self,nodeName="ekf_icp"):
@@ -78,7 +78,6 @@ class ICPLocalization(Localization,EKF):
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
         self.laser_pub = rospy.Publisher('/target_laser',LaserScan,queue_size=3)
         # self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
-        
         
     def updateMap(self):
         print("debug: try update map obstacle")
@@ -118,6 +117,7 @@ class ICPLocalization(Localization,EKF):
         print('------seq:  ',msg.header.seq)
         if self.isFirstScan:
             self.laserTemplate=msg
+            self.laserTemplate.header.frame_id=("ekf_icp")
             self.tar_pc = self.icp.laserToNumpy(self.laserEstimation(self.xEst))
             self.icp.tar_pc=self.icp.laserToNumpy(msg)
             # print("ddddddddddddddddddd ",self.tar_pc - self.laserToNumpy(msg))
@@ -151,15 +151,21 @@ class ICPLocalization(Localization,EKF):
         '''
         # laser is defined by the laser subscription
         # short and elegent implementation!
+        print("laserEstimation x={}".format(x))
         self.laserTemplate.header.seq+=1
         data=self.laserTemplate
         data.ranges=[self.inf]*len(data.ranges)
+        data.header.stamp=rospy.Time(0)
         for each in self.obstacle:
             # points from x to each
             dr=each-np.array(x[0:2,0])
             distance=np.linalg.norm(dr)
             dtheta=math.asin(self.obstacle_r/distance)
             theta=math.atan2(dr[1],dr[0])-x[2,0]
+            while theta<-np.pi:
+                theta+=2*np.pi
+            while theta>np.pi:
+                theta-=2*np.pi
             angleRange=[theta-dtheta,theta+dtheta]
             # the index of laser covered
             indexRange=(np.array(angleRange)+np.pi)/data.angle_increment
@@ -167,8 +173,11 @@ class ICPLocalization(Localization,EKF):
             distance-=self.obstacle_r
             for index in range(int(indexRange[0]),int(math.ceil(indexRange[1])+1)):
                 if index>indexRange[0] and index<indexRange[1]:
-                    if data.ranges[index]>distance:
-                        data.ranges[index]=distance
+                    tempIndex=index%len(data.ranges)
+                    if data.ranges[tempIndex]>distance:
+                        data.ranges[tempIndex]=distance
+        # for debugging
+        self.laser_pub.publish(data)
         return data
 
     def calc_map_observation(self,msg):
@@ -177,7 +186,7 @@ class ICPLocalization(Localization,EKF):
         and map laser. 
         Return: column vector z.
         '''
-        T=self.icp.processICP(self.icp.laserToNumpy(msg),self.tar_pc)
+        T=self.icp.processICP(self.icp.laserToNumpy(msg),self.tar_pc,initialT=self.x2T(self.xEst))
         z=self.T2z(T)
         return z
 
@@ -201,6 +210,9 @@ class ICPLocalization(Localization,EKF):
         # .T can be viewed as transpose in 2 dimentional matrix.
         return u.T
 
+    def x2T(self,x):
+        T=tf.transformations.euler_matrix(0,0,x[2,0])[0:3,0:3]
+        T[0:2,2]=x[0:2,0]
     # EKF virtual function.
     def observation_model(self,x):
         return self.calc_map_observation(self.laserEstimation(x))

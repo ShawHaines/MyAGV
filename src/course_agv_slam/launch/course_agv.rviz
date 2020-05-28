@@ -8,9 +8,8 @@ Panels:
         - /Status1
         - /RobotModel1
         - /TF1
-        - /TF1/Frames1
         - /Odometry2/Shape1
-        - /LaserScan2
+        - /Odometry3
       Splitter Ratio: 0.5
     Tree Height: 549
   - Class: rviz/Selection
@@ -86,6 +85,8 @@ Visualization Manager:
           Value: true
         course_agv__right_wheel:
           Value: true
+        ekf_icp:
+          Value: true
         icp_odom:
           Value: true
         map:
@@ -103,6 +104,8 @@ Visualization Manager:
       Show Names: false
       Tree:
         world_base:
+          ekf_icp:
+            {}
           icp_odom:
             {}
           map:
@@ -146,6 +149,36 @@ Visualization Manager:
       Style: Flat Squares
       Topic: /course_agv/laser/scan
       Unreliable: true
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/LaserScan
+      Color: 78; 154; 6
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 0
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: LaserScan
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.10000000149011612
+      Style: Spheres
+      Topic: /target_laser
+      Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -236,35 +269,39 @@ Visualization Manager:
       Topic: /wheel_odom
       Unreliable: false
       Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
+    - Angle Tolerance: 0.10000000149011612
+      Class: rviz/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
         Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/LaserScan
-      Color: 78; 154; 6
-      Color Transformer: FlatColor
-      Decay Time: 0
       Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 0
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: LaserScan
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.10000000149011612
-      Style: Spheres
-      Topic: /target_laser
+      Keep: 100
+      Name: Odometry
+      Position Tolerance: 0.10000000149011612
+      Shape:
+        Alpha: 1
+        Axes Length: 1
+        Axes Radius: 0.10000000149011612
+        Color: 0; 255; 0
+        Head Length: 0.30000001192092896
+        Head Radius: 0.10000000149011612
+        Shaft Length: 1
+        Shaft Radius: 0.05000000074505806
+        Value: Arrow
+      Topic: /ekf_icp
       Unreliable: false
-      Use Fixed Frame: true
-      Use rainbow: true
       Value: true
   Enabled: true
   Global Options:
@@ -294,16 +331,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 12.653873443603516
+      Distance: 4.542819499969482
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -1.2862786054611206
-        Y: 0.5548138618469238
-        Z: 1.3053057193756104
+        X: -0.5123803615570068
+        Y: 1.7511852979660034
+        Z: 2.278494119644165
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -330,5 +367,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 623
+  X: 642
   Y: 27
