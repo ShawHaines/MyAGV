@@ -113,7 +113,7 @@ class ICPBase(Localization):
         
 
         self.laser_count  = 0
-        # process once every 5 laser frames
+        # inteval should not be set too small(like 1). Recommend that process once every 5 laser frames
         self.laser_inteval= 5
         
         # max iterations
