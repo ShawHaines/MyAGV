@@ -216,7 +216,9 @@ class ICPBase(Localization):
         
         # allows one-to-multiple pair
         for i in range(length):
+            # TODO:np parallel computing is much faster than looping. Compare the code commented out and this!
             temp=np.linalg.norm(tar-src[:,i].reshape(2,1),axis=0)
+            # temp=[np.linalg.norm(tar[:,j]-src[:,i]) for j in range(length)]
             index=np.argmin(temp)
             neighbour.tar_indices[i]=index
             neighbour.distances[i]  =temp[index]
