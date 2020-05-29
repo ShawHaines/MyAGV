@@ -113,8 +113,8 @@ class ICPBase(Localization):
         
 
         self.laser_count  = 0
-        # inteval should not be set too small(like 1). Recommend that process once every 5 laser frames
-        self.laser_inteval= 5
+        # interval should not be set too small(like 1). Recommend that process once every 5 laser frames
+        self.laser_interval= 5
         
         # max iterations
         self.max_iter = int(rospy.get_param('/icp/max_iter',10))
@@ -271,7 +271,7 @@ class ICP(ICPBase):
     def __init__(self,nodeName="icp_odom"):
         super(ICP,self).__init__(nodeName)
 
-        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=self.laser_inteval)
+        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=self.laser_interval)
     
     def laserCallback(self,msg):
         # process and fit laser pointcloud data. 
@@ -285,7 +285,7 @@ class ICP(ICPBase):
         
         # process once every 5 laser scan because laser fps is too high
         self.laser_count += 1
-        if self.laser_count < self.laser_inteval:
+        if self.laser_count < self.laser_interval:
             return
         self.laser_count = 0
         time_0 = rospy.Time.now()

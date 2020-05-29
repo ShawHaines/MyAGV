@@ -29,7 +29,7 @@ class SubICP(ICPBase):
         self.src_pc = self.laserToNumpy(msg)
         # print('input cnt: ',self.src_pc.shape[1])
 
-        T=self.processICP(self.src_pc,self.tar_pc)
+        T=self.processICP(self.src_pc,self.tar_pc,initialT=np.identity(3))
         self.tar_pc = np.copy(self.src_pc) # moving the target to src
         self.translateResult(T)
         self.publishResult()
@@ -54,10 +54,13 @@ class ICPLocalization(Localization,EKF):
         self.icp = SubICP()
         
         # something needed like icp.
+        
         self.tar_pc=None
         self.isFirstScan=True
         self.laserTemplate=LaserScan()
         self.laser_count=0
+        # interval
+        self.icp.laser_interval=5
 
         # State Vector [x y yaw].T, column vector.
         # self.xOdom = np.zeros((3,1))
@@ -118,16 +121,16 @@ class ICPLocalization(Localization,EKF):
         if self.isFirstScan:
             self.laserTemplate=msg
             self.laserTemplate.header.frame_id=("ekf_icp")
-            self.tar_pc = self.icp.laserToNumpy(self.laserEstimation(self.xEst))
+            # self.tar_pc = self.icp.laserToNumpy(self.laserEstimation(self.xEst))
+            self.tar_pc=self.icp.laserToNumpy(msg)
             self.icp.tar_pc=self.icp.laserToNumpy(msg)
             # print("ddddddddddddddddddd ",self.tar_pc - self.laserToNumpy(msg))
             self.isFirstScan = False
             return
         
-        # Update once every 5 laser scan because laser fps is too high
+        # Update once every 5 laser scan because the we cannot distinguish rotation if interval is too small.
         self.laser_count += 1
-        if self.laser_count < self.icp.laser_inteval:
-            print("skipped.")
+        if self.laser_count < self.icp.laser_interval:
             return
         
         # Updating process
@@ -150,8 +153,8 @@ class ICPLocalization(Localization,EKF):
         Simulate the laser data from the estimated position x. msg is the reference laser.
         '''
         # laser is defined by the laser subscription
-        # short and elegent implementation!
-        print("laserEstimation x={}".format(x))
+        # short and elegant implementation!
+        print("\n\nlaserEstimation x=\n{}\n\n".format(x))
         self.laserTemplate.header.seq+=1
         data=self.laserTemplate
         data.ranges=[self.inf]*len(data.ranges)
@@ -160,6 +163,11 @@ class ICPLocalization(Localization,EKF):
             # points from x to each
             dr=each-np.array(x[0:2,0])
             distance=np.linalg.norm(dr)
+            if distance<self.obstacle_r:
+                # it means our xEst has stepped into an obstacle, 
+                # better pretend the obstacle isn't there... 
+                # But it may break the thin obstacle edge.
+                continue
             dtheta=math.asin(self.obstacle_r/distance)
             theta=math.atan2(dr[1],dr[0])-x[2,0]
             while theta<-np.pi:
@@ -186,7 +194,8 @@ class ICPLocalization(Localization,EKF):
         and map laser. 
         Return: column vector z.
         '''
-        T=self.icp.processICP(self.icp.laserToNumpy(msg),self.tar_pc,initialT=self.x2T(self.xEst))
+        # T=self.icp.processICP(self.icp.laserToNumpy(msg),self.tar_pc,initialT=self.x2T(self.xEst))
+        T=self.icp.processICP(self.icp.laserToNumpy(msg),self.tar_pc,initialT=np.identity(3))
         z=self.T2z(T)
         return z
 
