@@ -137,8 +137,9 @@ class ICPBase(Localization):
         # init some variables
         src=np.copy(source)
         tar=np.copy(target)
-        if not initialT:
+        if initialT is None:
             try:
+                # wheel auxilary. If you wnat to avoid it, pass in an identity(3) as initial.
                 rospy.wait_for_service("/course_agv/odometry",timeout=0.1)
                 newPose=rospy.ServiceProxy("/course_agv/odometry",Odometry_srv)()
                 newPose=newPose.pose
@@ -169,41 +170,26 @@ class ICPBase(Localization):
         # FIXME: learn about relativity! the laser in the frame moves opposite
         translation=-translation
         rotation=np.transpose(rotation)
-        
         iterations=0
-        temp=np.copy(tar)
-        lastDeviation=0
+        # temp=np.copy(tar)
+        lastDeviation=self.inf
         
         # don't move src_pc, adjust tar_pc to fit src.
         for _ in range(self.max_iter): # I haven't seen this grammar before...
             # transform tar_pc:
             iterations += 1
-            for i in range(np.size(tar,1)):
-                # FIXME: You CAN'T change the target!
-                temp[:,i]=np.dot(rotation,tar[:,i])+translation
-
+            # elegant matrix multiplying
+            temp=np.dot(rotation,tar)+translation.reshape((2,1))
             neighbour=self.findNearest(src,temp)
             deviation=np.sum(neighbour.distances)
-            if deviation>10:
-                with open("./abc",'w') as f:
-                    f.write("neighbour.tar_indices=\n{}\n".format(neighbour.tar_indices))
-                    f.write("src_pc=\n{}\n".format(self.src_pc))
-                    f.write("tar_pc=\n{}\n".format(self.tar_pc))
-                    f.write("temp=\n{}\n".format(temp))
-                    f.write("d={}\n".format(deviation))
-                sys.exit(1)
-            if lastDeviation==deviation or deviation<self.tolerance:
+            print("d= {} (iterations{})".format(deviation,iterations))
+            if lastDeviation==deviation or deviation<self.tolerance*np.size(src,1):
                 break
             lastDeviation=deviation
             # change the pairing rule
-            for i in range(np.size(tar,1)):
-                temp[:,i]=tar[:,neighbour.tar_indices[i]]
-            # FIXME: again the SHALLOW COPY!
-            tar=np.copy(temp)
-            rotation,translation=self.getTransform(src,tar)
-            
-            print("d= {} (iterations{})".format(deviation,iterations))
-        
+            temp=tar[:,neighbour.tar_indices] # elegant and pythonic!
+            rotation,translation=self.getTransform(src,temp)
+                  
         print("--------------------------------------")
         print("total iterations: {}".format(iterations))
         # print("total deviation: {}".format(np.sum(neighbour.distances)))
@@ -217,38 +203,32 @@ class ICPBase(Localization):
         return T
 
     def findNearest(self,src,tar):
+        '''
+        guarantees that src and tar won't change.
+        '''
         # find the pairing strategy between src and tar.
         neighbour = NeighBor()
         length=np.size(src,1)
         # or you can use .tolist() method, since there's only one dimension, we can stick with this.
-        neighbour.src_indices=list(np.zeros(length))
+        neighbour.src_indices=range(length)
         neighbour.tar_indices=list(np.zeros(length)) 
         neighbour.distances=list(np.zeros(length))
         
-        temp=[np.linalg.norm(src[:,i]-tar[:,j]) for i in range(length) for j in range(length)]
-        temp=np.reshape(temp,(length,length))
-        # print("distance matrix:{}".format(temp))
+        # allows one-to-multiple pair
         for i in range(length):
+            temp=np.linalg.norm(tar-src[:,i].reshape(2,1),axis=0)
             index=np.argmin(temp)
-            row,column=index//length,index%length
-            neighbour.src_indices[i]=row
-            neighbour.tar_indices[i]=column
-            neighbour.distances[i]  =temp[row,column]
-            # removing this point pair...
-            temp[row,:]=self.inf
-            temp[:,column]=self.inf
-        # very pythonic and elegent use of reordering! sort according to the src_indices in ascending order.
-        ordering=np.argsort(neighbour.src_indices)
-        # only array supports such operations...
-        neighbour.src_indices=list(np.array(neighbour.src_indices)[ordering])
-        neighbour.tar_indices=list(np.array(neighbour.tar_indices)[ordering])
-        neighbour.distances  =list(np.array(neighbour.distances)[ordering])
+            neighbour.tar_indices[i]=index
+            neighbour.distances[i]  =temp[index]
         
         # print("neighbour:\n\ttar_indices:{}".format(neighbour.tar_indices))
         # print("\tdistances:{}".format(neighbour.distances))
         return neighbour
 
     def getTransform(self,src,tar):
+        '''
+        guarantees that src and tar won't change.
+        '''
         # be very careful that the arguments are passed in as references.
         if np.size(src,1)!= np.size(tar,1):
             print("error in length!")
@@ -261,11 +241,6 @@ class ICPBase(Localization):
         # print("srcCenter:{}".format(srcCenter))
         # print("tarCenter:{}".format(tarCenter))
         
-        # # TODO: There's still improving space.
-        # q_all=[np.dot(np.reshape(tar[:,i]-tarCenter,(2,1)),np.reshape(src[:,i]-srcCenter,(1,2))) for i in range(length)]
-        # # print(q_all)
-        # W=np.sum(q_all,axis=0)
-
         # ELEGANT!
         srcPrime=src-srcCenter.reshape((2,1))
         tarPrime=tar-tarCenter.reshape((2,1))
@@ -315,7 +290,7 @@ class ICP(ICPBase):
         self.src_pc = self.laserToNumpy(msg)
         # print('input cnt: ',self.src_pc.shape[1])
 
-        T=self.processICP(self.src_pc,self.tar_pc)
+        T=self.processICP(self.src_pc,self.tar_pc,initialT=np.identity(3))
         self.tar_pc = np.copy(self.src_pc) # moving the target to src
         self.translateResult(T)
         self.publishResult()
