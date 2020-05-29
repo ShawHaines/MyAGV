@@ -7,7 +7,6 @@ from nav_msgs.msg import Path,OccupancyGrid
 from geometry_msgs.msg import PoseStamped,Point,PointStamped,Quaternion
 from std_msgs.msg import Header
 from course_agv_nav.srv import Plan,PlanResponse
-# from course_agv_nav.srv import Plan,PlanResponse
 
 # import matplotlib as mpl
 # mpl.use('Agg')

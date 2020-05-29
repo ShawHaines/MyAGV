@@ -13,7 +13,7 @@ def onRecievePose(data):
     # print("my_position: ",position)
     broadcaster.sendTransform((position.x,position.y,position.z),
                             (orientation.x,orientation.y,orientation.z,orientation.w),
-                            rospy.Time.now(),
+                            rospy.Time(0),
                             "robot_base","map")
 
 if __name__ == "__main__":

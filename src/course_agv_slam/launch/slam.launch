@@ -1,0 +1,10 @@
+<launch>
+	<node pkg="course_agv_slam" type="slam_ekf.py" name="localization" output="screen" >
+		<param name="range_threshold" value="0.5"/>
+		<param name="radius_max_th" value="0.4"/>
+		<param name="landMark_min_pt" value="2"/>
+		<param name="min_match" value="2"/>
+	</node>
+
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find course_agv_slam)/launch/course_agv.rviz" />
+</launch>

@@ -5,5 +5,10 @@
         "/opt/ros/melodic/lib/python2.7/dist-packages"
     ],
     "python.formatting.provider": "yapf",
-    "cmake.configureOnOpen": false
+    "cmake.configureOnOpen": false,
+    "python.autoComplete.extraPaths": [
+        "/home/shaw/catkin_ws/devel/lib/python2.7/dist-packages",
+        "/opt/ros/melodic/lib/python2.7/dist-packages"
+    ],
+    "ros.distro": "melodic"
 }
