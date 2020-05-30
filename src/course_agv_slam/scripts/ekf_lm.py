@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from ekf import EKF
 
 # EKF state covariance
 Cx = np.diag([0.35, 0.35, np.deg2rad(15.0)]) ** 2
@@ -8,9 +9,9 @@ M_DIST_TH = 0.6  # Threshold of Mahalanobis distance for data association.
 STATE_SIZE = 3  # State size [x,y,yaw]
 LM_SIZE = 2  # LM state size [x,y]
 
-class EKF():
+class EKF_Landmark(EKF):
     def __init__(self):
-        pass
+        super(EKF_Landmark,self).__init__()
     def estimate(self, xEst, PEst, z, u):
         # Predict
         ## TODO

@@ -49,7 +49,8 @@ class ICPLocalization(Localization,EKF):
         # it only calls the Localization __init__ method. but EKF doesn't need init.
         super(ICPLocalization,self).__init__(nodeName)
         # EKF.__init__(self)
-        # very impressive...
+        
+        # In order to avoid IO and communication, 
         # ICP node is included to access its processICP() method directly.
         self.icp = SubICP()
         
