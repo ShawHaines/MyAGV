@@ -16,14 +16,12 @@ class EKF(object):
         pass
     def estimate(self, xEst, PEst, z, u):
         G,Fx=self.jacob_motion(xEst,u)
-        GSquare=np.dot(G,G)
-        FxSquare=np.dot(Fx,Fx)
-        covariance=np.dot(GSquare,PEst)+np.dot(FxSquare,Q)
-        m=self.jacob_h()
-
+        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(Q,Fx))
+        
         # Predict
         xPredict=self.odom_model(xEst,u)
         zEst=self.observation_model(xPredict)
+        m=self.jacob_h()
 
         # Karman factor. Universal formula.
         K=np.dot(np.dot(covariance,m.T),np.linalg.inv(np.dot(m,np.dot(covariance,m.T))+R))

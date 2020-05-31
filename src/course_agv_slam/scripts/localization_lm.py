@@ -10,16 +10,17 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import MarkerArray,Marker
 import numpy as np
-from icp import ICP,Localization
-from ekf import EKF
-from extraction import LandMarkSet,Extraction
+from icp import LandmarkICP,Localization
+from ekf_lm import EKF_Landmark
+from extraction import Extraction
 # from localization import ICPLocalization
 
-class LandmarkLocalization(Localization):
+class LandmarkLocalization(Localization,EKF_Landmark):
+    alpha=3.0
     def __init__(self,nodeName="ekf_lm"):
         super(LandmarkLocalization,self).__init__(nodeName)
 
-        self.icp = ICP()
+        self.icp = LandmarkICP()
         self.extraction = Extraction()
 
         self.src_pc = None
@@ -68,7 +69,7 @@ class LandmarkLocalization(Localization):
                 landmarkList.append((x,y))
         originPos=np.array([self.map.info.origin.position.x,self.map.info.origin.position.y])
         # numpy's broadcasting feature
-        self.tar_pc=(np.array(landmarkList)*self.map.info.resolution+originPos).T
+        self.tar_pc=np.transpose(np.array(landmarkList)*self.map.info.resolution+originPos)
         print("landmark list:\n{}".format(self.tar_pc))
         print("debug: update map obstacle success! ")
 
@@ -85,11 +86,12 @@ class LandmarkLocalization(Localization):
                 return False
         return True
 
-    # There's something different.
+    # feed icp landmark instead of laser.
     def laserCallback(self,msg):
         print('------seq:  ',msg.header.seq)
         if self.isFirstScan:
-            self.icp.tar_pc=self.icp.laserToNumpy(msg)
+            # feed in landmarks.
+            self.icp.tar_pc=self.extraction.process(msg)
             self.isFirstScan = False
             return
         
@@ -100,20 +102,15 @@ class LandmarkLocalization(Localization):
         
         # Updating process
         self.laser_count = 0
-        self.calc_odometry(msg)
+        landmarks=self.extraction.process(msg,True)
+        u=self.calc_odometry(landmarks)
         
-        # z is the absolute states.
-        z=self.calc_map_observation(msg)
+        # z is the landmarks as a 2*n array.
+        z=landmarks
         # xEst is both predicted and updated in the ekf.
         self.xEst,self.PEst=self.estimate(self.xEst,self.PEst,z,u)
         self.publishResult()
-        pass
-
-        u = self.calc_odometry(msg)
-        z = self.ekf.odom_model(self.xEst,self.calc_map_observation(self.icp.laserToNumpy(msg)))
-        self.xEst,self.PEst = self.ekf.estimate(self.xEst,self.PEst,z,u)
-        self.publishResult()
-        pass
+        return
 
     def calc_odometry(self,msg):
         '''
@@ -126,70 +123,28 @@ class LandmarkLocalization(Localization):
         u=self.icp.xEst-state0
         return u
 
-    def calc_map_observation(self,msg):
-        landmarks_src = self.extraction.process(msg,True)
-        # landmarks_tar = self.extraction.process(self.laserEstimation(),True)
+    # def calc_map_observation(self,msg):
+    #     landmarks_src = self.extraction.process(msg,True)
+    #     # landmarks_tar = self.extraction.process(self.laserEstimation(),True)
 
-        self.publishLandMark(landmarks_src,landmarks_tar)
-        src_pc = landmarks_src
-        # tar_pc = landmarks_tar
-        transform_acc = self.icp.processICP(tar_pc,src_pc)
-        return self.T2z(transform_acc)
+    #     self.publishLandMark(landmarks_src,color="b")
+    #     self.publishLandMark(landmarks_tar,color="g")
+    #     src_pc = landmarks_src
+    #     # tar_pc = landmarks_tar
+    #     transform_acc = self.icp.processICP(tar_pc,src_pc)
+    #     return self.T2u(transform_acc)
+    #     pass
 
-    def publishLandMark(self,msg,msg2):
-        # msg = LandMarkSet()
-        # TODO: change the input interface into pc 
+    def publishLandMark(self,msg,color="b"):
+        '''
+        msg=2*n np array.
+        '''
         if len(msg.id) <= 0:
             return
         
-        landMark_array_msg = MarkerArray()
-        for i in range(len(msg.id)):
-            marker = Marker()
-            marker.header.frame_id = "course_agv__hokuyo__link"
-            marker.header.stamp = rospy.Time(0)
-            marker.ns = "lm"
-            marker.id = i
-            marker.type = Marker.SPHERE
-            marker.action = Marker.ADD
-            marker.pose.position.x = msg.position_x[i]
-            marker.pose.position.y = msg.position_y[i]
-            marker.pose.position.z = 0 # 2D
-            marker.pose.orientation.x = 0.0
-            marker.pose.orientation.y = 0.0
-            marker.pose.orientation.z = 0.0
-            marker.pose.orientation.w = 1.0
-            marker.scale.x = 0.2
-            marker.scale.y = 0.2
-            marker.scale.z = 0.2
-            marker.color.a = 0.5 # Don't forget to set the alpha
-            marker.color.r = 0.0
-            marker.color.g = 0.0
-            marker.color.b = 1.0
-            landMark_array_msg.markers.append(marker)
-        for i in range(len(msg2.id)):
-            marker = Marker()
-            marker.header.frame_id = "course_agv__hokuyo__link"
-            marker.header.stamp = rospy.Time(0)
-            marker.ns = "lm"
-            marker.id = i+len(msg.id)
-            marker.type = Marker.SPHERE
-            marker.action = Marker.ADD
-            marker.pose.position.x = msg2.position_x[i]
-            marker.pose.position.y = msg2.position_y[i]
-            marker.pose.position.z = 0 # 2D
-            marker.pose.orientation.x = 0.0
-            marker.pose.orientation.y = 0.0
-            marker.pose.orientation.z = 0.0
-            marker.pose.orientation.w = 1.0
-            marker.scale.x = 0.2
-            marker.scale.y = 0.2
-            marker.scale.z = 0.2
-            marker.color.a = 0.5 # Don't forget to set the alpha
-            marker.color.r = 0.0
-            marker.color.g = 1.0
-            marker.color.b = 0.0
-            landMark_array_msg.markers.append(marker)
-        self.landMark_pub.publish(landMark_array_msg)
+        landMark_array = MarkerArray()
+        landMark_array.markers=[self.toMarker(x,i,color) for i,x in enumerate(msg.T)]
+        self.landMark_pub.publish(landMark_array)
 
     def toMarker(self,pair,id=0,color="b"):
         '''
@@ -212,9 +167,50 @@ class LandmarkLocalization(Localization):
         # * is a very useful grammar when passing arguments! 
         # expands the list or tuple in order. 
         marker.color=ColorRGBA(*colorDict[color])
+        return marker
+
+    # EKF virtual function.
+    def observation_model(self,xEst):
+        '''
+        returns an 2*n column vector list.
+        [z1,z2,....zn]
+        '''
+        rotation=tf.transformations.euler_matrix(0,0,xEst[2,0])[0:2,0:2]
+        z=np.dot(rotation.T,self.tar_pc-xEst[0:2,0].reshape(2,1))
+        return z
+
+    def estimate(self,xEst,PEst,z,u):
+        G,Fx=self.jacob_motion(xEst,u)
+        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(self.Cx,Fx))
+        
+        # Predict
+        xPredict=self.odom_model(xEst,u)
+        zEst=self.observation_model(xPredict)
+        neighbour=self.icp.findNearest(z,zEst)
+        length=len(neighbour.src_indices)
+        variance=self.alpha/(length+self.alpha)
+
+        print("length: {} variance: {}".format(length,variance))
+
+        zPredict=zEst[:,neighbour.tar_indices]
+
+        m=self.jacob_h(self.tar_pc,neighbour,xPredict)
+        # z (2*n)array->(2n*1) array
+        zPredict=np.vstack(np.hsplit(zPredict,np.size(zPredict,1)))
+        zPrime  =np.vstack(np.hsplit(z,np.size(z,1)))
+        
+        # Karman factor. Universal formula.
+        K=np.dot(np.dot(covariance,m.T),np.linalg.inv(np.dot(m,np.dot(covariance,m.T))+np.diag([variance]*2*length)))
+
+        # Update
+        xEst=xPredict+np.dot(K,zPrime-zPredict)
+        PEst=covariance-np.dot(K,np.dot(m,covariance))
+
+        return xEst, PEst
+
 def main():
     rospy.init_node('localization_node')
-    l = Localization()
+    l = LandmarkLocalization()
     rospy.spin()
     pass
 

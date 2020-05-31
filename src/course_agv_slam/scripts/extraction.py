@@ -20,7 +20,7 @@ class Extraction():
         
         jumpPos=np.nonzero(np.abs(delta)>self.range_threshold)[0]
         np.append(jumpPos,jumpPos[0]+np.size(delta))
-        for i in range(np.size(jumpPos)):
+        for i in range(np.size(jumpPos)-1):
             points=jumpPos[i+1]-jumpPos[i]
             # ensure enough points.
             if points>=self.landMark_min_pt:
@@ -42,5 +42,5 @@ class Extraction():
         theta =theta[labels]
         # id is not important...
         # landmark.id=labels
-        landmark=np.vstack(((np.multiply(np.cos(theta),ranges),np.multiply(np.sin(theta),ranges)))
+        landmark=np.vstack((np.multiply(np.cos(theta),ranges),np.multiply(np.sin(theta),ranges)))
         return landmark

@@ -8,35 +8,9 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
 import numpy as np
 # wow!
-from icp import Localization,ICPBase
+from icp import Localization,SubICP
 from ekf import EKF
 import sys
-import copy
-
-class SubICP(ICPBase):
-    '''
-    The management of firstScan etc. are moved to the Localization 
-    object to handle.
-    '''
-    def __init__(self):
-        super(SubICP,self).__init__()
-    
-    def laserCallback(self,msg):
-        '''
-        laser ICP odometry.
-        '''
-        time_0 = rospy.Time.now()
-        self.src_pc = self.laserToNumpy(msg)
-        # print('input cnt: ',self.src_pc.shape[1])
-
-        T=self.processICP(self.src_pc,self.tar_pc,initialT=np.identity(3))
-        self.tar_pc = np.copy(self.src_pc) # moving the target to src
-        self.translateResult(T)
-        self.publishResult()
-        duration=rospy.Time.now()-time_0
-        print("time_cost: {} s".format(duration.to_sec()))
-        pass
-
 
 class ICPLocalization(Localization,EKF):
     inf=1e2
@@ -131,7 +105,7 @@ class ICPLocalization(Localization,EKF):
         
         # Updating process
         self.laser_count = 0
-        self.calc_odometry(msg)
+        u=self.calc_odometry(msg)
      
         # z is the absolute states.
         z=self.calc_map_observation(msg)

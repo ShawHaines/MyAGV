@@ -315,6 +315,51 @@ class ICP(ICPBase):
         print("time_cost: {} s".format(duration.to_sec()))
         pass
 
+# used in localization.py
+class SubICP(ICPBase):
+    '''
+    The management of firstScan etc. are moved to the Localization 
+    object to handle.
+    '''
+    def __init__(self):
+        super(SubICP,self).__init__()
+    
+    def laserCallback(self,msg):
+        '''
+        laser ICP odometry.
+        '''
+        time_0 = rospy.Time.now()
+        self.src_pc = self.laserToNumpy(msg)
+        # print('input cnt: ',self.src_pc.shape[1])
+
+        T=self.processICP(self.src_pc,self.tar_pc,initialT=np.identity(3))
+        self.tar_pc = np.copy(self.src_pc) # moving the target to src
+        self.translateResult(T)
+        self.publishResult()
+        duration=rospy.Time.now()-time_0
+        print("time_cost: {} s".format(duration.to_sec()))
+        pass
+
+class LandmarkICP(ICPBase):
+    def __init__(self):
+        super(LandmarkICP,self).__init__()
+    
+    def laserCallback(self,msg):
+        '''
+        laser ICP odometry.
+        '''
+        time_0 = rospy.Time.now()
+        self.src_pc = msg
+        # print('input cnt: ',self.src_pc.shape[1])
+
+        T=self.processICP(self.src_pc,self.tar_pc,initialT=np.identity(3))
+        self.tar_pc = np.copy(self.src_pc) # moving the target to src
+        self.translateResult(T)
+        self.publishResult()
+        duration=rospy.Time.now()-time_0
+        print("time_cost: {} s".format(duration.to_sec()))
+        pass
+
 def main():
     rospy.init_node('icp_node')
     icp = ICP()
