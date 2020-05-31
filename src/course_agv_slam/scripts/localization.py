@@ -39,11 +39,7 @@ class SubICP(ICPBase):
 
 
 class ICPLocalization(Localization,EKF):
-    # direction: up, down, left, right
-    directions=np.array([(0,1),(0,-1),(-1,0),(1,0)])
     inf=1e2
-
-
     def __init__(self,nodeName="ekf_icp"):
 
         # it only calls the Localization __init__ method. but EKF doesn't need init.
@@ -61,13 +57,12 @@ class ICPLocalization(Localization,EKF):
         self.laserTemplate=LaserScan()
         self.laser_count=0
         # interval
-        self.icp.laser_interval=5
+        self.laser_interval=5
 
         # State Vector [x y yaw].T, column vector.
         # self.xOdom = np.zeros((3,1))
         self.xEst = np.zeros((3,1))
         
-        # What exactly is this PEst?
         # P is the covariance.
         self.PEst = np.eye(3) # the same with identity
                 
@@ -131,17 +126,13 @@ class ICPLocalization(Localization,EKF):
         
         # Update once every 5 laser scan because the we cannot distinguish rotation if interval is too small.
         self.laser_count += 1
-        if self.laser_count < self.icp.laser_interval:
+        if self.laser_count < self.laser_interval:
             return
         
         # Updating process
         self.laser_count = 0
-        # laser callback is manually fed by its owner class.
-        state0=np.copy(self.icp.xEst)
-        self.icp.laserCallback(msg)
-        # relative state.
-        u=self.icp.xEst-state0
-        
+        self.calc_odometry(msg)
+     
         # z is the absolute states.
         z=self.calc_map_observation(msg)
         # xEst is both predicted and updated in the ekf.
@@ -189,6 +180,17 @@ class ICPLocalization(Localization,EKF):
         self.laser_pub.publish(data)
         return data
 
+    def calc_odometry(self,msg):
+        '''
+        Let icp handle the odometry, returns a relative odometry u.
+        '''
+        state0=np.copy(self.icp.xEst)
+        # laser callback is manually fed by its owner class.
+        self.icp.laserCallback(msg)
+        # relative state.
+        u=self.icp.xEst-state0
+        return u
+
     def calc_map_observation(self,msg):
         '''
         Using ICP to calculate the fitting Transform matrix between current laser
@@ -197,12 +199,14 @@ class ICPLocalization(Localization,EKF):
         '''
         # T=self.icp.processICP(self.icp.laserToNumpy(msg),self.tar_pc,initialT=self.x2T(self.xEst))
         T=self.icp.processICP(self.icp.laserToNumpy(msg),self.tar_pc,initialT=np.identity(3))
-        z=self.T2z(T)
+        z=self.T2u(T)
         return z
 
     def fourConnected(self,pair):
+        # direction: up, down, left, right
+        directions=np.array([(0,1),(0,-1),(-1,0),(1,0)])
         pair=np.array(pair)
-        for dr in self.directions:
+        for dr in directions:
             newPair=pair+dr
             # detects if the obstacle is on the boundary
             if newPair[0]<0 or newPair[0]>=self.map.info.width or newPair[1]<0 or newPair[1]>=self.map.info.height:
@@ -211,18 +215,6 @@ class ICPLocalization(Localization,EKF):
                 return False
         return True
     
-    def T2z(self,t):
-        '''
-        translate absolute transform matrix T to absolute z.
-        '''
-        dw = math.atan2(t[1,0],t[0,0])
-        u = np.array([[t[0,2],t[1,2],dw]])
-        # .T can be viewed as transpose in 2 dimentional matrix.
-        return u.T
-
-    def x2T(self,x):
-        T=tf.transformations.euler_matrix(0,0,x[2,0])[0:3,0:3]
-        T[0:2,2]=x[0:2,0]
     # EKF virtual function.
     def observation_model(self,x):
         return self.calc_map_observation(self.laserEstimation(x))

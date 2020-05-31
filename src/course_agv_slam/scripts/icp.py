@@ -89,6 +89,21 @@ class Localization(object):
         dy = a[1] - b[1]
         return math.hypot(dx,dy)
 
+    def T2u(self,t):
+        '''
+        translate relative transform matrix T to relative u.
+        Note that relative u is according to self frame.
+        x=x+[[R,0],[0,1]] u
+        '''
+        dw = math.atan2(t[1,0],t[0,0])
+        u = np.array([[t[0,2],t[1,2],dw]])
+        # .T can be viewed as transpose in 2 dimentional matrix.
+        return u.T
+
+    def x2T(self,x):
+        T=tf.transformations.euler_matrix(0,0,x[2,0])[0:3,0:3]
+        T[0:2,2]=x[0:2,0]
+
 class ICPBase(Localization):
     def __init__(self,nodeName="icp_odom"):
 

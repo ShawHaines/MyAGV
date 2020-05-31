@@ -83,6 +83,8 @@ class EKF_Landmark(EKF):
 
         return min_id
 
-    
-    def pi_2_pi(self, angle):
+    def piRange(self, angle):
+        '''
+        normalize the angle in range [-pi,pi]
+        '''
         return (angle + math.pi) % (2 * math.pi) - math.pi

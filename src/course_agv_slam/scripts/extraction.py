@@ -3,11 +3,6 @@ from sensor_msgs.msg import LaserScan
 
 import numpy as np
 import rospy
-class LandMarkSet():
-    def __init__(self):
-        self.position_x = []
-        self.position_y = []
-        self.id = []
 
 class Extraction():
     def __init__(self):
@@ -30,20 +25,22 @@ class Extraction():
             # ensure enough points.
             if points>=self.landMark_min_pt:
                 # ensure not too large radius. A rough estimation, radius*angle
-                if ranges[jumpPos[i]]*msg.angle_increment*points<=self.radius_max_th:
+                if ranges[jumpPos[i]]*msg.angle_increment*points<=self.radius_max_th*2:
                     # This is a landmark, use the average index
                     labels.append((jumpPos[i]+jumpPos[i+1])//2)
         return self.extractLandMark(msg,labels,trust)
         
     #  What's the difference between the two functions?
     def extractLandMark(self,msg,labels,trust):
-        landmark=LandMarkSet()
+        '''
+        no longer use landMarkSet class. Use pointCloud (2*n array) as return value.
+        '''
         ranges=np.array(msg.ranges)
         theta =np.linspace(msg.angle_min,msg.angle_max,len(msg.ranges))
 
         ranges=ranges[labels]
         theta =theta[labels]
-        landmark.id=labels
-        landmark.position_x=list(np.multiply(np.cos(theta),ranges))
-        landmark.position_y=list(np.multiply(np.sin(theta),ranges))
+        # id is not important...
+        # landmark.id=labels
+        landmark=np.vstack(((np.multiply(np.cos(theta),ranges),np.multiply(np.sin(theta),ranges)))
         return landmark
