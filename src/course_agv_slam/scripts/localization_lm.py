@@ -17,7 +17,7 @@ from extraction import Extraction
 
 class LandmarkLocalization(Localization,EKF_Landmark):
     alpha=3.0
-    def __init__(self,nodeName="ekf_lm"):
+    def __init__(self,nodeName="ekf_icp"):
         super(LandmarkLocalization,self).__init__(nodeName)
 
         self.icp = LandmarkICP()
@@ -27,7 +27,7 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         self.isFirstScan = True
         self.laser_count=0
         # interval
-        self.laser_interval=5
+        self.laser_interval=1
 
         # State Vector [x y yaw].T, column vector.
         # self.xOdom = np.zeros((3,1))
@@ -42,7 +42,7 @@ class LandmarkLocalization(Localization,EKF_Landmark):
 
         # ros topic
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
-        self.landMark_pub = rospy.Publisher('/landmarks',MarkerArray,queue_size=1)
+        self.landMark_pub = rospy.Publisher('/landmarks',MarkerArray,queue_size=3)
         # self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
 
     def updateMap(self):
@@ -103,6 +103,7 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         # Updating process
         self.laser_count = 0
         landmarks=self.extraction.process(msg,True)
+        self.publishLandMark(landmarks,"b")
         u=self.calc_odometry(landmarks)
         
         # z is the landmarks as a 2*n array.
@@ -123,24 +124,12 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         u=self.icp.xEst-state0
         return u
 
-    # def calc_map_observation(self,msg):
-    #     landmarks_src = self.extraction.process(msg,True)
-    #     # landmarks_tar = self.extraction.process(self.laserEstimation(),True)
-
-    #     self.publishLandMark(landmarks_src,color="b")
-    #     self.publishLandMark(landmarks_tar,color="g")
-    #     src_pc = landmarks_src
-    #     # tar_pc = landmarks_tar
-    #     transform_acc = self.icp.processICP(tar_pc,src_pc)
-    #     return self.T2u(transform_acc)
-    #     pass
-
     def publishLandMark(self,msg,color="b"):
         '''
         msg=2*n np array.
         '''
-        if len(msg.id) <= 0:
-            return
+        # if len(msg) <= 0:
+        #     return
         
         landMark_array = MarkerArray()
         landMark_array.markers=[self.toMarker(x,i,color) for i,x in enumerate(msg.T)]
@@ -152,9 +141,9 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         '''
         # order: R,G,B,Alpha. Don't forget to set the alpha.
         colorDict={
-            "r":[1,0,0,0.5], "R":[1,0,0,0.5],
-            "g":[0,1,0,0.5], "G":[0,1,0,0.5],
-            "b":[0,0,1,0.5], "B":[0,0,1,0.5],
+            "r":[1,0,0,0.8], "R":[1,0,0,0.8],
+            "g":[0,1,0,0.8], "G":[0,1,0,0.8],
+            "b":[0,0,1,0.8], "B":[0,0,1,0.8],
         }
         marker = Marker(header=Header(id,rospy.Time(0),"course_agv__hokuyo__link"))
         marker.ns = "lm"
@@ -187,13 +176,13 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         xPredict=self.odom_model(xEst,u)
         zEst=self.observation_model(xPredict)
         neighbour=self.icp.findNearest(z,zEst)
+        zPredict=zEst[:,neighbour.tar_indices]
         length=len(neighbour.src_indices)
         variance=self.alpha/(length+self.alpha)
 
         print("length: {} variance: {}".format(length,variance))
 
-        zPredict=zEst[:,neighbour.tar_indices]
-
+        self.publishLandMark(zPredict,"g")
         m=self.jacob_h(self.tar_pc,neighbour,xPredict)
         # z (2*n)array->(2n*1) array
         zPredict=np.vstack(np.hsplit(zPredict,np.size(zPredict,1)))
