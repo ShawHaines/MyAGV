@@ -19,6 +19,9 @@ class EKF_Landmark(EKF):
         the Jacobian of observation model.
         '''
         length=len(neighbour.tar_indices)
+        if length==0:
+            print("Error: no matching points!")
+            return 0
         rotation=tf.transformations.euler_matrix(0,0,x[2,0])[0:2,0:2]
         # the yaw(theta) derivative of rotation. [[-sin,cos],[-cos,-sin]]
         derivativeR=tf.transformations.euler_matrix(0,0,x[2,0]+math.pi/2)[0:2,0:2]

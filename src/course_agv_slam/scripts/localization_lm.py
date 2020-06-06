@@ -44,6 +44,14 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
         self.landMark_pub = rospy.Publisher('/landmarks',MarkerArray,queue_size=3)
         # self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
+        
+        # parameters from launch file.
+        # minimum landmark matches to update.
+        self.min_match = int(rospy.get_param('/localization/min_match',2))
+        # minimum number of points for a landmark cluster
+        self.extraction.landMark_min_pt = int(rospy.get_param('/localization/landMark_min_pt',2))
+        # maximum radius to be identified as landmark
+        self.extraction.radius_max_th = float(rospy.get_param('/localization/radius_max_th',0.4))
 
     def updateMap(self):
         '''
@@ -185,17 +193,19 @@ class LandmarkLocalization(Localization,EKF_Landmark):
 
         length=len(neighbour.src_indices)
         variance=self.alpha/(length+self.alpha)
-
         print("\n\nlength: {} variance: {}".format(length,variance))
+        if length<self.min_match:
+            print("Matching points are too little to execute update.")
+            #  only update according to the prediction stage.
+            return xPredict, covariance
 
         self.publishLandMark(zPredict,color="g",namespace="paired",frame="ekf_icp")
         m=self.jacob_h(self.tar_pc,neighbour,xPredict)
+
         # z (2*n)array->(2n*1) array
         zPredict=np.vstack(np.hsplit(zPredict,np.size(zPredict,1)))
         zPrime  =np.vstack(np.hsplit(zPrime,np.size(zPrime,1)))
         print("delta z: \n{}\n\n".format(zPrime-zPredict))
-        # FIXME: the delta z is very far from correct.
-        
         
         # Karman factor. Universal formula.
         K=np.dot(np.dot(covariance,m.T),np.linalg.inv(np.dot(m,np.dot(covariance,m.T))+np.diag([variance]*2*length)))
