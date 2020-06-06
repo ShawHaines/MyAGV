@@ -133,7 +133,7 @@ class ICPBase(Localization):
         
         # max iterations
         self.max_iter = int(rospy.get_param('/icp/max_iter',10))
-        # distance threshold for filter the matching points
+        # distance threshold for matching points
         self.dis_th = float(rospy.get_param('/icp/dis_th',0.5))
         # tolerance to stop icp
         self.tolerance = float(rospy.get_param('/icp/tolerance',0))
@@ -198,12 +198,13 @@ class ICPBase(Localization):
             neighbour=self.findNearest(src,temp)
             deviation=np.sum(neighbour.distances)
             # print("d= {} (iterations{})".format(deviation,iterations))
-            if lastDeviation==deviation or deviation<self.tolerance*np.size(src,1):
+            if lastDeviation==deviation or deviation<self.tolerance*len(neighbour.src_indices):
                 break
             lastDeviation=deviation
             # change the pairing rule
-            temp=tar[:,neighbour.tar_indices] # elegant and pythonic!
-            rotation,translation=self.getTransform(src,temp)
+            tempTar=tar[:,neighbour.tar_indices] # elegant and pythonic!
+            tempSrc=src[:,neighbour.src_indices]
+            rotation,translation=self.getTransform(tempSrc,tempTar)
                   
         # print("--------------------------------------")
         # print("total iterations: {}".format(iterations))
@@ -224,19 +225,17 @@ class ICPBase(Localization):
         # find the pairing strategy between src and tar.
         neighbour = NeighBor()
         length=np.size(src,1)
-        # or you can use .tolist() method, since there's only one dimension, we can stick with this.
-        neighbour.src_indices=range(length)
-        neighbour.tar_indices=list(np.zeros(length)) 
-        neighbour.distances=list(np.zeros(length))
-        
         # allows one-to-multiple pair
         for i in range(length):
             # np parallel computing is much faster than looping. Compare the code commented out and this!
             temp=np.linalg.norm(tar-src[:,i].reshape(2,1),axis=0) # distance
             # temp=[np.linalg.norm(tar[:,j]-src[:,i]) for j in range(length)]
             index=np.argmin(temp)
-            neighbour.tar_indices[i]=index
-            neighbour.distances[i]  =temp[index]
+            # filter out the non-matching point pairs
+            if temp[index]<self.dis_th:
+                neighbour.src_indices.append(i)
+                neighbour.tar_indices.append(index)
+                neighbour.distances.append(temp[index])
         
         # print("neighbour:\n\ttar_indices:{}".format(neighbour.tar_indices))
         # print("\tdistances:{}".format(neighbour.distances))

@@ -181,6 +181,8 @@ class LandmarkLocalization(Localization,EKF_Landmark):
 
         neighbour=self.icp.findNearest(z,zEst)
         zPredict=zEst[:,neighbour.tar_indices]
+        zPrime=z[:,neighbour.src_indices]
+
         length=len(neighbour.src_indices)
         variance=self.alpha/(length+self.alpha)
 
@@ -190,7 +192,7 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         m=self.jacob_h(self.tar_pc,neighbour,xPredict)
         # z (2*n)array->(2n*1) array
         zPredict=np.vstack(np.hsplit(zPredict,np.size(zPredict,1)))
-        zPrime  =np.vstack(np.hsplit(z,np.size(z,1)))
+        zPrime  =np.vstack(np.hsplit(zPrime,np.size(zPrime,1)))
         print("delta z: \n{}\n\n".format(zPrime-zPredict))
         # FIXME: the delta z is very far from correct.
         
