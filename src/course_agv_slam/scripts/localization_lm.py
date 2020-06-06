@@ -182,13 +182,14 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         length=len(neighbour.src_indices)
         variance=self.alpha/(length+self.alpha)
 
-        print("length: {} variance: {}".format(length,variance))
+        print("\n\nlength: {} variance: {}".format(length,variance))
 
         self.publishLandMark(zPredict,"g","ekf_icp")
         m=self.jacob_h(self.tar_pc,neighbour,xPredict)
         # z (2*n)array->(2n*1) array
         zPredict=np.vstack(np.hsplit(zPredict,np.size(zPredict,1)))
         zPrime  =np.vstack(np.hsplit(z,np.size(z,1)))
+        print("delta z: \n{}\n\n".format(zPrime-zPredict))
         
         # Karman factor. Universal formula.
         K=np.dot(np.dot(covariance,m.T),np.linalg.inv(np.dot(m,np.dot(covariance,m.T))+np.diag([variance]*2*length)))

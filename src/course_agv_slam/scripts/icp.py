@@ -47,7 +47,7 @@ class Localization(object):
         print("T: {}".format(T))
         delta_yaw = math.atan2(T[1,0],T[0,0])
         # [[cos(theta),-sin(theta)],[sin(theta),cos(theta)]]
-        print("sensor-delta-xyt:[{},{},{}]".format(T[0,2],T[1,2],delta_yaw))
+        # print("sensor-delta-xyt:[{},{},{}]".format(T[0,2],T[1,2],delta_yaw))
         # improved readability
         # rotation=T[0:2,0:2]
         translation=T[0:2,2].reshape(2,1)
@@ -181,7 +181,7 @@ class ICPBase(Localization):
             rotation = initialT[0:2,0:2]
             translation=initialT[0:2,2]
 
-        print("initial rotation:\n{} \ntranslation:{}".format(rotation,translation))
+        # print("initial rotation:\n{} \ntranslation:{}".format(rotation,translation))
         # FIXME: learn about relativity! the laser in the frame moves opposite
         translation=-translation
         rotation=np.transpose(rotation)
@@ -197,7 +197,7 @@ class ICPBase(Localization):
             temp=np.dot(rotation,tar)+translation.reshape((2,1))
             neighbour=self.findNearest(src,temp)
             deviation=np.sum(neighbour.distances)
-            print("d= {} (iterations{})".format(deviation,iterations))
+            # print("d= {} (iterations{})".format(deviation,iterations))
             if lastDeviation==deviation or deviation<self.tolerance*np.size(src,1):
                 break
             lastDeviation=deviation
@@ -205,8 +205,8 @@ class ICPBase(Localization):
             temp=tar[:,neighbour.tar_indices] # elegant and pythonic!
             rotation,translation=self.getTransform(src,temp)
                   
-        print("--------------------------------------")
-        print("total iterations: {}".format(iterations))
+        # print("--------------------------------------")
+        # print("total iterations: {}".format(iterations))
         # print("total deviation: {}".format(np.sum(neighbour.distances)))
         T=np.identity(3)
         # because of the relative relation between frames, R and T should reverse
