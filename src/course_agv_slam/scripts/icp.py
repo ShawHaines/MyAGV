@@ -44,7 +44,7 @@ class Localization(object):
 
     def translateResult(self,T):
         # what exactly is this T? T is a affine transformation matrix of 1 higher order.
-        print("T: {}".format(T))
+        # print("T: {}".format(T))
         delta_yaw = math.atan2(T[1,0],T[0,0])
         # [[cos(theta),-sin(theta)],[sin(theta),cos(theta)]]
         # print("sensor-delta-xyt:[{},{},{}]".format(T[0,2],T[1,2],delta_yaw))
@@ -231,8 +231,8 @@ class ICPBase(Localization):
         
         # allows one-to-multiple pair
         for i in range(length):
-            # TODO:np parallel computing is much faster than looping. Compare the code commented out and this!
-            temp=np.linalg.norm(tar-src[:,i].reshape(2,1),axis=0)
+            # np parallel computing is much faster than looping. Compare the code commented out and this!
+            temp=np.linalg.norm(tar-src[:,i].reshape(2,1),axis=0) # distance
             # temp=[np.linalg.norm(tar[:,j]-src[:,i]) for j in range(length)]
             index=np.argmin(temp)
             neighbour.tar_indices[i]=index

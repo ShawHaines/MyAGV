@@ -126,7 +126,7 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         u=self.icp.xEst-state0
         return u
 
-    def publishLandMark(self,msg,color="b",frame="course_agv__hokuyo__link"):
+    def publishLandMark(self,msg,color="b",namespace="laser",frame="course_agv__hokuyo__link"):
         '''
         msg=2*n np array.
         '''
@@ -134,10 +134,10 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         #     return
         
         landMark_array = MarkerArray()
-        landMark_array.markers=[self.toMarker(x,i,color,frame) for i,x in enumerate(msg.T)]
+        landMark_array.markers=[self.toMarker(x,i,color,namespace,frame) for i,x in enumerate(msg.T)]
         self.landMark_pub.publish(landMark_array)
 
-    def toMarker(self,pair,id=0,color="b",frame="course_agv__hokuyo__link"):
+    def toMarker(self,pair,id=0,color="b",namespace="laser",frame="course_agv__hokuyo__link"):
         '''
         color can be "r","g","b"
         '''
@@ -148,7 +148,7 @@ class LandmarkLocalization(Localization,EKF_Landmark):
             "b":[0,0,1,0.8], "B":[0,0,1,0.8],
         }
         marker = Marker(header=Header(id,rospy.Time(0),frame))
-        marker.ns = "lm"
+        marker.ns = namespace
         marker.id = id
         marker.type = Marker.SPHERE
         marker.action = Marker.ADD
@@ -177,6 +177,8 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         # Predict
         xPredict=self.odom_model(xEst,u)
         zEst=self.observation_model(xPredict)
+        self.publishLandMark(zEst,color="r",namespace="estimate",frame="ekf_icp")
+
         neighbour=self.icp.findNearest(z,zEst)
         zPredict=zEst[:,neighbour.tar_indices]
         length=len(neighbour.src_indices)
@@ -184,12 +186,14 @@ class LandmarkLocalization(Localization,EKF_Landmark):
 
         print("\n\nlength: {} variance: {}".format(length,variance))
 
-        self.publishLandMark(zPredict,"g","ekf_icp")
+        self.publishLandMark(zPredict,color="g",namespace="paired",frame="ekf_icp")
         m=self.jacob_h(self.tar_pc,neighbour,xPredict)
         # z (2*n)array->(2n*1) array
         zPredict=np.vstack(np.hsplit(zPredict,np.size(zPredict,1)))
         zPrime  =np.vstack(np.hsplit(z,np.size(z,1)))
         print("delta z: \n{}\n\n".format(zPrime-zPredict))
+        # FIXME: the delta z is very far from correct.
+        
         
         # Karman factor. Universal formula.
         K=np.dot(np.dot(covariance,m.T),np.linalg.inv(np.dot(m,np.dot(covariance,m.T))+np.diag([variance]*2*length)))
