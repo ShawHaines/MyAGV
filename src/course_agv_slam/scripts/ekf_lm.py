@@ -26,7 +26,7 @@ class EKF_Landmark(EKF):
         # the yaw(theta) derivative of rotation. [[-sin,cos],[-cos,-sin]]
         derivativeR=tf.transformations.euler_matrix(0,0,x[2,0]+math.pi/2)[0:2,0:2]
         z=tar[:,neighbour.tar_indices]
-        partialTheta=np.dot(derivativeR,z-x[0:2,0].reshape(2,1))
+        partialTheta=np.dot(np.transpose(derivativeR),z-x[0:2,0].reshape(2,1))
         partialTheta=np.vstack(np.hsplit(partialTheta,length))
         H=np.repeat(-np.transpose(rotation),length,axis=0)
         H=np.hstack((H,partialTheta))
