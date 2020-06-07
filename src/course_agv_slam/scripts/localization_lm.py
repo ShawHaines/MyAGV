@@ -151,9 +151,9 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         '''
         # order: R,G,B,Alpha. Don't forget to set the alpha.
         colorDict={
-            "r":[1,0,0,0.8], "R":[1,0,0,0.8],
-            "g":[0,1,0,0.8], "G":[0,1,0,0.8],
-            "b":[0,0,1,0.8], "B":[0,0,1,0.8],
+            "r":[1,0,0,1.0], "R":[1,0,0,1.0],
+            "g":[0,1,0,1.0], "G":[0,1,0,1.0],
+            "b":[0,0,1,1.0], "B":[0,0,1,1.0],
         }
         marker = Marker(header=Header(id,rospy.Time(0),frame))
         marker.ns = namespace
