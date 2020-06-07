@@ -14,23 +14,20 @@ class Extraction():
         labels = []
         # I don't know what trust are, just ignoring them...
         ranges=np.array(msg.ranges)
-        length=np.size(ranges)
         # add a ranges[0] at the end so that diff won't subtract the length by 1
         np.append(ranges,ranges[0])
         delta=np.diff(ranges)
-        # the jump is between jumpPos and jumpPos+1
-        jumpPos=np.nonzero(np.abs(delta)>self.range_threshold)[0] # use [0] because return value is a tuple.
-        for i in range(np.size(jumpPos)):
-            if i<np.size(jumpPos)-1:
-                points=jumpPos[i+1]-jumpPos[i]
-            else:
-                points=jumpPos[0]+length-jumpPos[i]
+        # jump is between jumpPos and jumpPos+1
+        jumpPos=np.nonzero(np.abs(delta)>self.range_threshold)[0]
+        np.append(jumpPos,jumpPos[0]+np.size(delta))
+        for i in range(np.size(jumpPos)-1):
+            points=jumpPos[i+1]-jumpPos[i]
             # ensure enough points.
             if points>=self.landMark_min_pt:
                 # ensure not too large radius. A rough estimation, radius*angle
                 if ranges[jumpPos[i]]*msg.angle_increment*points<=self.radius_max_th*2:
-                    # store a tuple into labels.
-                    labels.append((jumpPos[i],jumpPos[i+1 if i+1<np.size(jumpPos) else 0]))
+                    # This is a landmark, use the average index
+                    labels.append(((jumpPos[i]+jumpPos[i+1]+1)//2)%np.size(delta))
         return self.extractLandMark(msg,labels,trust)
         
     #  What's the difference between the two functions?
@@ -39,15 +36,11 @@ class Extraction():
         no longer use landMarkSet class. Use pointCloud (2*n array) as return value.
         '''
         ranges=np.array(msg.ranges)
-        total_num=len(msg.ranges)
-        angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)
-        pc = np.vstack((np.multiply(np.cos(angle_l),ranges),np.multiply(np.sin(angle_l),ranges)))
+        theta =np.linspace(msg.angle_min,msg.angle_max,len(msg.ranges))
 
-        length=len(labels)
-        landmark=np.zeros((2,length))
-        for index,(i,j) in enumerate(labels):
-            if i<j:
-                landmark[:,index]=np.mean(pc[:,np.arange(i+1,j+1)],axis=1)
-            else:
-                landmark[:,index]=np.mean(pc[:,np.hstack((np.arange(i+1,total_num),np.arange(j+1)))],axis=1)
+        ranges=ranges[labels]
+        theta =theta[labels]
+        # id is not important...
+        # landmark.id=labels
+        landmark=np.vstack((np.multiply(np.cos(theta),ranges),np.multiply(np.sin(theta),ranges)))
         return landmark
