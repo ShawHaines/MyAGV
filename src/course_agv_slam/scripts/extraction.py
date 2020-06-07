@@ -17,7 +17,7 @@ class Extraction():
         # add a ranges[0] at the end so that diff won't subtract the length by 1
         np.append(ranges,ranges[0])
         delta=np.diff(ranges)
-        
+        # jump is between jumpPos and jumpPos+1
         jumpPos=np.nonzero(np.abs(delta)>self.range_threshold)[0]
         np.append(jumpPos,jumpPos[0]+np.size(delta))
         for i in range(np.size(jumpPos)-1):
@@ -27,7 +27,7 @@ class Extraction():
                 # ensure not too large radius. A rough estimation, radius*angle
                 if ranges[jumpPos[i]]*msg.angle_increment*points<=self.radius_max_th*2:
                     # This is a landmark, use the average index
-                    labels.append((jumpPos[i]+jumpPos[i+1])//2)
+                    labels.append(((jumpPos[i]+jumpPos[i+1]+1)//2)%np.size(delta))
         return self.extractLandMark(msg,labels,trust)
         
     #  What's the difference between the two functions?
