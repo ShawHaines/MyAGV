@@ -44,10 +44,10 @@ class Localization(object):
 
     def translateResult(self,T):
         # what exactly is this T? T is a affine transformation matrix of 1 higher order.
-        print("T: {}".format(T))
+        # print("T: {}".format(T))
         delta_yaw = math.atan2(T[1,0],T[0,0])
         # [[cos(theta),-sin(theta)],[sin(theta),cos(theta)]]
-        print("sensor-delta-xyt:[{},{},{}]".format(T[0,2],T[1,2],delta_yaw))
+        # print("sensor-delta-xyt:[{},{},{}]".format(T[0,2],T[1,2],delta_yaw))
         # improved readability
         # rotation=T[0:2,0:2]
         translation=T[0:2,2].reshape(2,1)
@@ -89,6 +89,21 @@ class Localization(object):
         dy = a[1] - b[1]
         return math.hypot(dx,dy)
 
+    def T2u(self,t):
+        '''
+        translate relative transform matrix T to relative u.
+        Note that relative u is according to self frame.
+        x=x+[[R,0],[0,1]] u
+        '''
+        dw = math.atan2(t[1,0],t[0,0])
+        u = np.array([[t[0,2],t[1,2],dw]])
+        # .T can be viewed as transpose in 2 dimentional matrix.
+        return u.T
+
+    def x2T(self,x):
+        T=tf.transformations.euler_matrix(0,0,x[2,0])[0:3,0:3]
+        T[0:2,2]=x[0:2,0]
+
 class ICPBase(Localization):
     def __init__(self,nodeName="icp_odom"):
 
@@ -113,12 +128,12 @@ class ICPBase(Localization):
         
 
         self.laser_count  = 0
-        # inteval should not be set too small(like 1). Recommend that process once every 5 laser frames
-        self.laser_inteval= 5
+        # interval should not be set too small(like 1). Recommend that process once every 5 laser frames
+        self.laser_interval= 5
         
         # max iterations
         self.max_iter = int(rospy.get_param('/icp/max_iter',10))
-        # distance threshold for filter the matching points
+        # distance threshold for matching points
         self.dis_th = float(rospy.get_param('/icp/dis_th',0.5))
         # tolerance to stop icp
         self.tolerance = float(rospy.get_param('/icp/tolerance',0))
@@ -166,7 +181,7 @@ class ICPBase(Localization):
             rotation = initialT[0:2,0:2]
             translation=initialT[0:2,2]
 
-        print("initial rotation:\n{} \ntranslation:{}".format(rotation,translation))
+        # print("initial rotation:\n{} \ntranslation:{}".format(rotation,translation))
         # FIXME: learn about relativity! the laser in the frame moves opposite
         translation=-translation
         rotation=np.transpose(rotation)
@@ -182,16 +197,17 @@ class ICPBase(Localization):
             temp=np.dot(rotation,tar)+translation.reshape((2,1))
             neighbour=self.findNearest(src,temp)
             deviation=np.sum(neighbour.distances)
-            print("d= {} (iterations{})".format(deviation,iterations))
-            if lastDeviation==deviation or deviation<self.tolerance*np.size(src,1):
+            # print("d= {} (iterations{})".format(deviation,iterations))
+            if lastDeviation==deviation or deviation<self.tolerance*len(neighbour.src_indices):
                 break
             lastDeviation=deviation
             # change the pairing rule
-            temp=tar[:,neighbour.tar_indices] # elegant and pythonic!
-            rotation,translation=self.getTransform(src,temp)
+            tempTar=tar[:,neighbour.tar_indices] # elegant and pythonic!
+            tempSrc=src[:,neighbour.src_indices]
+            rotation,translation=self.getTransform(tempSrc,tempTar)
                   
-        print("--------------------------------------")
-        print("total iterations: {}".format(iterations))
+        # print("--------------------------------------")
+        # print("total iterations: {}".format(iterations))
         # print("total deviation: {}".format(np.sum(neighbour.distances)))
         T=np.identity(3)
         # because of the relative relation between frames, R and T should reverse
@@ -209,19 +225,17 @@ class ICPBase(Localization):
         # find the pairing strategy between src and tar.
         neighbour = NeighBor()
         length=np.size(src,1)
-        # or you can use .tolist() method, since there's only one dimension, we can stick with this.
-        neighbour.src_indices=range(length)
-        neighbour.tar_indices=list(np.zeros(length)) 
-        neighbour.distances=list(np.zeros(length))
-        
         # allows one-to-multiple pair
         for i in range(length):
-            # TODO:np parallel computing is much faster than looping. Compare the code commented out and this!
-            temp=np.linalg.norm(tar-src[:,i].reshape(2,1),axis=0)
+            # np parallel computing is much faster than looping. Compare the code commented out and this!
+            temp=np.linalg.norm(tar-src[:,i].reshape(2,1),axis=0) # distance
             # temp=[np.linalg.norm(tar[:,j]-src[:,i]) for j in range(length)]
             index=np.argmin(temp)
-            neighbour.tar_indices[i]=index
-            neighbour.distances[i]  =temp[index]
+            # filter out the non-matching point pairs
+            if temp[index]<self.dis_th:
+                neighbour.src_indices.append(i)
+                neighbour.tar_indices.append(index)
+                neighbour.distances.append(temp[index])
         
         # print("neighbour:\n\ttar_indices:{}".format(neighbour.tar_indices))
         # print("\tdistances:{}".format(neighbour.distances))
@@ -271,7 +285,7 @@ class ICP(ICPBase):
     def __init__(self,nodeName="icp_odom"):
         super(ICP,self).__init__(nodeName)
 
-        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=self.laser_inteval)
+        self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=self.laser_interval)
     
     def laserCallback(self,msg):
         # process and fit laser pointcloud data. 
@@ -285,11 +299,56 @@ class ICP(ICPBase):
         
         # process once every 5 laser scan because laser fps is too high
         self.laser_count += 1
-        if self.laser_count < self.laser_inteval:
+        if self.laser_count < self.laser_interval:
             return
         self.laser_count = 0
         time_0 = rospy.Time.now()
         self.src_pc = self.laserToNumpy(msg)
+        # print('input cnt: ',self.src_pc.shape[1])
+
+        T=self.processICP(self.src_pc,self.tar_pc,initialT=np.identity(3))
+        self.tar_pc = np.copy(self.src_pc) # moving the target to src
+        self.translateResult(T)
+        self.publishResult()
+        duration=rospy.Time.now()-time_0
+        print("time_cost: {} s".format(duration.to_sec()))
+        pass
+
+# used in localization.py
+class SubICP(ICPBase):
+    '''
+    The management of firstScan etc. are moved to the Localization 
+    object to handle.
+    '''
+    def __init__(self):
+        super(SubICP,self).__init__()
+    
+    def laserCallback(self,msg):
+        '''
+        laser ICP odometry.
+        '''
+        time_0 = rospy.Time.now()
+        self.src_pc = self.laserToNumpy(msg)
+        # print('input cnt: ',self.src_pc.shape[1])
+
+        T=self.processICP(self.src_pc,self.tar_pc,initialT=np.identity(3))
+        self.tar_pc = np.copy(self.src_pc) # moving the target to src
+        self.translateResult(T)
+        self.publishResult()
+        duration=rospy.Time.now()-time_0
+        print("time_cost: {} s".format(duration.to_sec()))
+        pass
+
+class LandmarkICP(ICPBase):
+    def __init__(self):
+        super(LandmarkICP,self).__init__()
+    
+    def laserCallback(self,msg):
+        '''
+        laser ICP odometry.
+        '''
+        time_0 = rospy.Time.now()
+        self.src_pc = msg
         # print('input cnt: ',self.src_pc.shape[1])
 
         T=self.processICP(self.src_pc,self.tar_pc,initialT=np.identity(3))

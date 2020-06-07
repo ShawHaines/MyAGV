@@ -8,62 +8,35 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
 import numpy as np
 # wow!
-from icp import Localization,ICPBase
+from icp import Localization,SubICP
 from ekf import EKF
 import sys
-import copy
-
-class SubICP(ICPBase):
-    '''
-    The management of firstScan etc. are moved to the Localization 
-    object to handle.
-    '''
-    def __init__(self):
-        super(SubICP,self).__init__()
-    
-    def laserCallback(self,msg):
-        '''
-        laser ICP odometry.
-        '''
-        time_0 = rospy.Time.now()
-        self.src_pc = self.laserToNumpy(msg)
-        # print('input cnt: ',self.src_pc.shape[1])
-
-        T=self.processICP(self.src_pc,self.tar_pc)
-        self.tar_pc = np.copy(self.src_pc) # moving the target to src
-        self.translateResult(T)
-        self.publishResult()
-        duration=rospy.Time.now()-time_0
-        print("time_cost: {} s".format(duration.to_sec()))
-        pass
-
 
 class ICPLocalization(Localization,EKF):
-    # direction: up, down, left, right
-    directions=np.array([(0,1),(0,-1),(-1,0),(1,0)])
     inf=1e2
-
-
     def __init__(self,nodeName="ekf_icp"):
 
         # it only calls the Localization __init__ method. but EKF doesn't need init.
         super(ICPLocalization,self).__init__(nodeName)
         # EKF.__init__(self)
-        # very impressive...
+        
+        # In order to avoid IO and communication, 
         # ICP node is included to access its processICP() method directly.
         self.icp = SubICP()
         
         # something needed like icp.
+        
         self.tar_pc=None
         self.isFirstScan=True
         self.laserTemplate=LaserScan()
         self.laser_count=0
+        # interval
+        self.laser_interval=5
 
         # State Vector [x y yaw].T, column vector.
         # self.xOdom = np.zeros((3,1))
         self.xEst = np.zeros((3,1))
         
-        # What exactly is this PEst?
         # P is the covariance.
         self.PEst = np.eye(3) # the same with identity
                 
@@ -118,26 +91,22 @@ class ICPLocalization(Localization,EKF):
         if self.isFirstScan:
             self.laserTemplate=msg
             self.laserTemplate.header.frame_id=("ekf_icp")
-            self.tar_pc = self.icp.laserToNumpy(self.laserEstimation(self.xEst))
+            # self.tar_pc = self.icp.laserToNumpy(self.laserEstimation(self.xEst))
+            self.tar_pc=self.icp.laserToNumpy(msg)
             self.icp.tar_pc=self.icp.laserToNumpy(msg)
             # print("ddddddddddddddddddd ",self.tar_pc - self.laserToNumpy(msg))
             self.isFirstScan = False
             return
         
-        # Update once every 5 laser scan because laser fps is too high
+        # Update once every 5 laser scan because the we cannot distinguish rotation if interval is too small.
         self.laser_count += 1
-        if self.laser_count < self.icp.laser_inteval:
-            print("skipped.")
+        if self.laser_count < self.laser_interval:
             return
         
         # Updating process
         self.laser_count = 0
-        # laser callback is manually fed by its owner class.
-        state0=np.copy(self.icp.xEst)
-        self.icp.laserCallback(msg)
-        # relative state.
-        u=self.icp.xEst-state0
-        
+        u=self.calc_odometry(msg)
+     
         # z is the absolute states.
         z=self.calc_map_observation(msg)
         # xEst is both predicted and updated in the ekf.
@@ -150,8 +119,8 @@ class ICPLocalization(Localization,EKF):
         Simulate the laser data from the estimated position x. msg is the reference laser.
         '''
         # laser is defined by the laser subscription
-        # short and elegent implementation!
-        print("laserEstimation x={}".format(x))
+        # short and elegant implementation!
+        print("\n\nlaserEstimation x=\n{}\n\n".format(x))
         self.laserTemplate.header.seq+=1
         data=self.laserTemplate
         data.ranges=[self.inf]*len(data.ranges)
@@ -160,6 +129,11 @@ class ICPLocalization(Localization,EKF):
             # points from x to each
             dr=each-np.array(x[0:2,0])
             distance=np.linalg.norm(dr)
+            if distance<self.obstacle_r:
+                # it means our xEst has stepped into an obstacle, 
+                # better pretend the obstacle isn't there... 
+                # But it may break the thin obstacle edge.
+                continue
             dtheta=math.asin(self.obstacle_r/distance)
             theta=math.atan2(dr[1],dr[0])-x[2,0]
             while theta<-np.pi:
@@ -180,19 +154,33 @@ class ICPLocalization(Localization,EKF):
         self.laser_pub.publish(data)
         return data
 
+    def calc_odometry(self,msg):
+        '''
+        Let icp handle the odometry, returns a relative odometry u.
+        '''
+        state0=np.copy(self.icp.xEst)
+        # laser callback is manually fed by its owner class.
+        self.icp.laserCallback(msg)
+        # relative state.
+        u=self.icp.xEst-state0
+        return u
+
     def calc_map_observation(self,msg):
         '''
         Using ICP to calculate the fitting Transform matrix between current laser
         and map laser. 
         Return: column vector z.
         '''
-        T=self.icp.processICP(self.icp.laserToNumpy(msg),self.tar_pc,initialT=self.x2T(self.xEst))
-        z=self.T2z(T)
+        # T=self.icp.processICP(self.icp.laserToNumpy(msg),self.tar_pc,initialT=self.x2T(self.xEst))
+        T=self.icp.processICP(self.icp.laserToNumpy(msg),self.tar_pc,initialT=np.identity(3))
+        z=self.T2u(T)
         return z
 
     def fourConnected(self,pair):
+        # direction: up, down, left, right
+        directions=np.array([(0,1),(0,-1),(-1,0),(1,0)])
         pair=np.array(pair)
-        for dr in self.directions:
+        for dr in directions:
             newPair=pair+dr
             # detects if the obstacle is on the boundary
             if newPair[0]<0 or newPair[0]>=self.map.info.width or newPair[1]<0 or newPair[1]>=self.map.info.height:
@@ -201,18 +189,6 @@ class ICPLocalization(Localization,EKF):
                 return False
         return True
     
-    def T2z(self,t):
-        '''
-        translate absolute transform matrix T to absolute z.
-        '''
-        dw = math.atan2(t[1,0],t[0,0])
-        u = np.array([[t[0,2],t[1,2],dw]])
-        # .T can be viewed as transpose in 2 dimentional matrix.
-        return u.T
-
-    def x2T(self,x):
-        T=tf.transformations.euler_matrix(0,0,x[2,0])[0:3,0:3]
-        T[0:2,2]=x[0:2,0]
     # EKF virtual function.
     def observation_model(self,x):
         return self.calc_map_observation(self.laserEstimation(x))

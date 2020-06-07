@@ -6,10 +6,9 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /RobotModel1
-        - /TF1
-        - /Odometry2/Shape1
-        - /Odometry3
+        - /Odometry1/Shape1
+        - /Odometry3/Shape1
+        - /MarkerArray1
       Splitter Ratio: 0.5
     Tree Height: 549
   - Class: rviz/Selection
@@ -227,9 +226,9 @@ Visualization Manager:
         Axes Length: 1
         Axes Radius: 0.10000000149011612
         Color: 255; 25; 0
-        Head Length: 0.30000001192092896
+        Head Length: 0.15000000596046448
         Head Radius: 0.10000000149011612
-        Shaft Length: 1
+        Shaft Length: 0.5
         Shaft Radius: 0.05000000074505806
         Value: Arrow
       Topic: /icp_odom
@@ -261,9 +260,9 @@ Visualization Manager:
         Axes Length: 1
         Axes Radius: 0.10000000149011612
         Color: 32; 74; 135
-        Head Length: 0.30000001192092896
+        Head Length: 0.15000000596046448
         Head Radius: 0.10000000149011612
-        Shaft Length: 1
+        Shaft Length: 0.5
         Shaft Radius: 0.05000000074505806
         Value: Arrow
       Topic: /wheel_odom
@@ -295,13 +294,23 @@ Visualization Manager:
         Axes Length: 1
         Axes Radius: 0.10000000149011612
         Color: 0; 255; 0
-        Head Length: 0.30000001192092896
+        Head Length: 0.15000000596046448
         Head Radius: 0.10000000149011612
-        Shaft Length: 1
+        Shaft Length: 0.5
         Shaft Radius: 0.05000000074505806
         Value: Arrow
       Topic: /ekf_icp
       Unreliable: false
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /landmarks
+      Name: MarkerArray
+      Namespaces:
+        estimate: true
+        laser: true
+        paired: true
+      Queue Size: 300
       Value: true
   Enabled: true
   Global Options:
@@ -331,16 +340,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 4.542819499969482
+      Distance: 12.553628921508789
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.5123803615570068
-        Y: 1.7511852979660034
-        Z: 2.278494119644165
+        X: -0.13873055577278137
+        Y: 1.2473617792129517
+        Z: 2.062521457672119
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
