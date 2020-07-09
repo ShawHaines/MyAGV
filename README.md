@@ -11,10 +11,14 @@ Improved by Shaw Haines. All rights reserved.
 * [x] [6.局部路径规划/调整](document/6_localplan.md)
 * [x] [7.特征点icp](document/7_icp.md)
 * [ ] [8.扩展卡尔曼滤波器](document/8_ekf.md)
-* [ ] [9.特征辨识与定位](document/9_ekf_lm.md)
+* [x] [9.特征辨识与定位](document/9_ekf_lm.md)
 * [ ] [10.SLAM地图构建与定位](document/10_ekf_slam.md)
 * [ ] [11.栅格地图构建](document/11_mapping.md)
 
 ## installation
 
-required: ros
+required:
+* ros-melodic (apt)
+* pynput (pip/conda)
+* matplotlib
+* numpy

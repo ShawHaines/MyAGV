@@ -1,5 +1,7 @@
 <launch>
 
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find course_agv_description)/urdf/course_agv.xacro'" />
+
   <!-- Load joint controller configurations from YAML file to parameter server -->
   <rosparam file="$(find course_agv_control)/config/course_agv_control.yaml" command="load"/>
 
