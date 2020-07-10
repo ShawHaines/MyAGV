@@ -10,7 +10,7 @@ from nav_msgs.msg import OccupancyGrid
 import numpy as np
 from icp import ICP
 from ekf_lm import EKF,STATE_SIZE
-from extraction import LandMarkSet,Extraction
+from extraction import Extraction
 from mapping import Mapping
 import sys
 
@@ -22,7 +22,7 @@ class SLAM_EKF():
         self.robot_x = rospy.get_param('/slam/robot_x',0)
         self.robot_y = rospy.get_param('/slam/robot_y',0)
         self.robot_theta = rospy.get_param('/slam/robot_theta',0)
-        ## ros param of mapping
+        ## ros parameter of mapping
         self.map_x_width = rospy.get_param('/slam/map_width')
         self.map_y_width = rospy.get_param('/slam/map_height')
         self.map_reso = rospy.get_param('/slam/map_resolution')
@@ -66,18 +66,18 @@ class SLAM_EKF():
         z = self.observation(lm)
         self.xEst,self.PEst = self.ekf.estimate(self.xEst,self.PEst,z,u)
 
-        # TODO
-        # obs = self.u2T(self.xEst[0:3]).dot(np_msg)
-        # pmap = self.mapping.update(obs[0], obs[1], self.xEst[0], self.xEst[1])
+        # FIXME
+        obs = self.u2T(self.xEst[0:3]).dot(np_msg)
+        pmap = self.mapping.update(obs[0], obs[1], self.xEst[0], self.xEst[1])
 
-        # self.publishMap(pmap)
+        self.publishMap(pmap)
         self.publishLandMark(lm)
         self.publishResult()
         pass
 
     def observation(self,lm):
         landmarks = lm
-        z = np.zeros((0, 3))
+        z = np.zeros((0, 3)) # 0 length...
         for i in range(len(landmarks.id)):
             dx = landmarks.position_x[i]
             dy = landmarks.position_y[i]
