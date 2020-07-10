@@ -14,9 +14,13 @@ class Extraction():
         labels = []
         # I don't know what trust are, just ignoring them...
         ranges=np.array(msg.ranges)
-        # add a ranges[0] at the end so that diff won't subtract the length by 1
-        np.append(ranges,ranges[0])
-        delta=np.diff(ranges)
+
+        theta =np.linspace(msg.angle_min,msg.angle_max,len(msg.ranges))
+        pointCloud=np.vstack((np.multiply(np.cos(theta),ranges),np.multiply(np.sin(theta),ranges)))
+        
+        # add a index[0] at the end so that diff won't subtract the length by 1
+        pointCloud=np.hstack((pointCloud,pointCloud[:,0].reshape(2,1)))
+        delta=np.linalg.norm(np.diff(pointCloud),axis=0)
         # jump is between jumpPos and jumpPos+1
         jumpPos=np.nonzero(np.abs(delta)>self.range_threshold)[0]
         np.append(jumpPos,jumpPos[0]+np.size(delta))
