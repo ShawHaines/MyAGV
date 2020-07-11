@@ -229,7 +229,7 @@ class ICPBase(Localization):
         # find the pairing strategy between src and tar.
         neighbour = NeighBor()
         length=np.size(src,1)
-        # allows one-to-multiple pair
+        # allows one tar to multiple src pair
         for i in range(length):
             # np parallel computing is much faster than looping. Compare the code commented out and this!
             temp=np.linalg.norm(tar-src[:,i].reshape(2,1),axis=0) # distance

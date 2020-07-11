@@ -11,7 +11,7 @@ from nav_msgs.msg import Odometry
 from visualization_msgs.msg import MarkerArray,Marker
 import numpy as np
 from icp import LandmarkICP,Localization,SubICP
-from ekf_lm import EKF_Landmark,STATE_SIZE,LM_SIZE
+from ekf_lm import EKF_Landmark,STATE_SIZE,LM_SIZE,Cx
 from extraction import Extraction
 # from localization import ICPLocalization
 
@@ -188,7 +188,7 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
 
     def estimate(self,xEst,PEst,z,u):
         G,Fx=self.jacob_motion(xEst,u)
-        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(self.Cx,Fx))
+        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(Cx,Fx))
         
         # Predict
         xPredict=self.odom_model(xEst,u)

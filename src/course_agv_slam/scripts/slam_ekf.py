@@ -8,16 +8,16 @@ from nav_msgs.msg import Odometry
 from visualization_msgs.msg import MarkerArray,Marker
 from nav_msgs.msg import OccupancyGrid
 import numpy as np
-from icp import LandmarkICP,SubICP
+from icp import LandmarkICP,SubICP,NeighBor
 from localization_lm import LandmarkLocalization
-from ekf_lm import EKF_Landmark,STATE_SIZE,LM_SIZE
+from ekf_lm import EKF_SLAM,STATE_SIZE,LM_SIZE
 from extraction import Extraction
 from mapping import Mapping
 # import sys
 
 MAX_LASER_RANGE = 30
 
-class SLAM_EKF(LandmarkLocalization,EKF_Landmark):
+class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
     alpha=3.0  # factor in estimating covariance.
     def __init__(self,nodeName="slam_ekf"):
         super(SLAM_EKF,self).__init__(nodeName)
@@ -47,12 +47,8 @@ class SLAM_EKF(LandmarkLocalization,EKF_Landmark):
         self.xEst = np.zeros((STATE_SIZE,1))
         # Covariance.
         self.PEst = np.eye(STATE_SIZE)
-
-        # init map
-        # map observation
-        self.tar_pc = None
-        self.updateMap()
-
+        # landMark Estimation. Like former self.tar_pc
+        self.lEst = np.array((LM_SIZE,0)) # lEst should be of 2*N size
         # FIXME: What are those?
         # map observation
         self.obstacle = []
@@ -89,14 +85,15 @@ class SLAM_EKF(LandmarkLocalization,EKF_Landmark):
 
         # Updating process
         self.laser_count = 0
-        landmarks=self.extraction.process(msg,True)
-        self.publishLandMark(landmarks,"b")
+        # z is the landmarks in self frame as a 2*n array.
+        z=self.extraction.process(msg,True)
+        self.publishLandMark(z,"b")
+        # relative displacement
         u=self.calc_odometry(msg)
         
-        # z is the landmarks as a 2*n array.
-        z=landmarks
-        # xEst is both predicted and updated in the ekf.
-        self.xEst,self.PEst=self.estimate(self.xEst,self.PEst,z,u)
+        # xEst,lEst,PEst is both predicted and updated in the ekf.
+        self.xEst,self.lEst,self.PEst=self.estimate(self.xEst,self.lEstself.PEst,z,u)
+
         self.publishResult()
 
         # np_msg = self.laserToNumpy(msg)
@@ -110,7 +107,6 @@ class SLAM_EKF(LandmarkLocalization,EKF_Landmark):
         # pointCloud = self.u2T(self.xEst[0:3]).dot(np_msg)
         pointCloud=np.dot(tf.transformations.euler_matrix(0,0,self.xEst[2,0])[0:2,0:2],self.icp.laserToNumpy(msg))+self.xEst[0:2]
         pmap = self.mapping.update(pointCloud, self.xEst[0:2].reshape(-1))
-
         self.publishMap(pmap)
         pass
 
@@ -133,11 +129,14 @@ class SLAM_EKF(LandmarkLocalization,EKF_Landmark):
         [z1,z2,....zn]
         '''
         rotation=tf.transformations.euler_matrix(0,0,xEst[2,0])[0:2,0:2]
-        z=np.dot(rotation.T,self.tar_pc-xEst[0:2,0].reshape(2,1))
+        z=np.dot(rotation.T,self.lEst-xEst[0:2])
         return z
 
-    def estimate(self,xEst,PEst,z,u):
-        G,Fx=self.jacob_motion(xEst,u)
+    def estimate(self,xEst,lEst,PEst,z,u):
+        # stack lEst. lEst is supposed to be 2*N size.
+        yEst=np.vstack(np.hsplit(lEst,np.size(lEst,1)))
+        yEst=np.vstack((xEst,yEst))
+        G,Fx=self.jacob_motion(xEst,lEst,u)
         covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(self.Cx,Fx))
         
         # Predict
@@ -146,8 +145,12 @@ class SLAM_EKF(LandmarkLocalization,EKF_Landmark):
         self.publishLandMark(zEst,color="r",namespace="estimate",frame=self.nodeName)
 
         neighbour=self.icp.findNearest(z,zEst)
+        # Predicted
         zPredict=zEst[:,neighbour.tar_indices]
+        # Observed
         zPrime=z[:,neighbour.src_indices]
+        # TODO: take good care of src_indices.
+        self.publishLandMark(zPredict,color="g",namespace="paired",frame=self.nodeName)
 
         length=len(neighbour.src_indices)
         variance=self.alpha/(length+self.alpha)
@@ -155,9 +158,8 @@ class SLAM_EKF(LandmarkLocalization,EKF_Landmark):
         if length<self.min_match:
             print("Matching points are too little to execute update.")
             #  only update according to the prediction stage.
-            return xPredict, covariance
+            return xPredict,lEst,covariance
 
-        self.publishLandMark(zPredict,color="g",namespace="paired",frame=self.nodeName)
         m=self.jacob_h(self.tar_pc,neighbour,xPredict)
 
         # z (2*n)array->(2n*1) array
@@ -196,50 +198,9 @@ class SLAM_EKF(LandmarkLocalization,EKF_Landmark):
         
         self.map_pub.publish(map_msg)
 
-    def updateMap(self):
-        '''
-        get all the isolated pixels in the map as landmarks,
-        then extract the positions of landmarks into self.tar_pc
-        '''
-        print("debug: try update map obstacle")
-        rospy.wait_for_service('/static_map')
-        try:
-            getMap = rospy.ServiceProxy('/static_map',GetMap)
-            self.map = getMap().map
-            # print(self.map)
-        except:
-            e = sys.exc_info()[0]
-            print('Service call failed: %s'%e)
-        
-        # transposed (row,column)-> (x,y)
-        self.map.data = np.array(self.map.data).reshape((-1,self.map.info.height)).transpose() 
-        tx,ty = np.nonzero((self.map.data > 20)|(self.map.data < -0.5))
-        landmarkList=[]
-        for (x,y) in zip(tx,ty):
-            if self.isolated((x,y)):
-                landmarkList.append((x,y))
-        originPos=np.array([self.map.info.origin.position.x,self.map.info.origin.position.y])
-        # numpy's broadcasting feature
-        self.tar_pc=np.transpose(np.array(landmarkList)*self.map.info.resolution+originPos)
-        print("landmark list:\n{}".format(self.tar_pc))
-        print("debug: update map obstacle success! ")
-
-    def isolated(self,pair):
-        # direction: up, down, left, right
-        directions=np.array([(0,1),(0,-1),(-1,0),(1,0)])
-        pair=np.array(pair)
-        for dr in directions:
-            newPair=pair+dr
-            # detects if the obstacle is on the boundary
-            if newPair[0]<0 or newPair[0]>=self.map.info.width or newPair[1]<0 or newPair[1]>=self.map.info.height:
-                continue
-            if self.map.data[tuple(newPair)]<-0.5 or self.map.data[tuple(newPair)]>20:
-                return False
-        return True
-
 def main():
     rospy.init_node('slam_node')
-    s = SLAM_EKF()
+    s = SLAM_Localization()
     rospy.spin()
     pass
 
