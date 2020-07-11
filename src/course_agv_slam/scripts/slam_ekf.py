@@ -8,43 +8,36 @@ from nav_msgs.msg import Odometry
 from visualization_msgs.msg import MarkerArray,Marker
 from nav_msgs.msg import OccupancyGrid
 import numpy as np
-from icp import ICP
-from ekf_lm import EKF,STATE_SIZE
+from icp import LandmarkICP,SubICP
+from localization_lm import LandmarkLocalization
+from ekf_lm import EKF_Landmark,STATE_SIZE,LM_SIZE
 from extraction import Extraction
 from mapping import Mapping
-import sys
+# import sys
 
 MAX_LASER_RANGE = 30
 
-class SLAM_EKF():
-    def __init__(self):
-        # ros param
-        self.robot_x = rospy.get_param('/slam/robot_x',0)
-        self.robot_y = rospy.get_param('/slam/robot_y',0)
-        self.robot_theta = rospy.get_param('/slam/robot_theta',0)
-        ## ros parameter of mapping
-        self.map_x_width = rospy.get_param('/slam/map_width')
-        self.map_y_width = rospy.get_param('/slam/map_height')
-        self.map_reso = rospy.get_param('/slam/map_resolution')
-        self.map_cellx_width = int(round(self.map_x_width/self.map_reso))
-        self.map_celly_width = int(round(self.map_y_width/self.map_reso))
+class SLAM_EKF(LandmarkLocalization,EKF_Landmark):
+    alpha=3.0  # factor in estimating covariance.
+    def __init__(self,nodeName="slam_ekf"):
+        super(SLAM_EKF,self).__init__(nodeName)
 
-        self.icp = ICP()
-        self.ekf = EKF()
+        self.icp = SubICP()
         self.extraction = Extraction()
         self.mapping = Mapping(self.map_cellx_width,self.map_celly_width,self.map_reso)
 
-        # odom robot init states
-        self.sensor_sta = [self.robot_x,self.robot_y,self.robot_theta]
+        self.src_pc = None
         self.isFirstScan = True
-        self.src_pc = []
-        self.tar_pc = []
-
-        # State Vector [x y yaw]
-        self.xOdom = np.zeros((STATE_SIZE, 1))
-        self.xEst = np.zeros((STATE_SIZE, 1))
+        self.laser_count=0
+        # interval
+        self.laser_interval=5
+        # State Vector [x y yaw].T, column vector.
+        # self.xOdom = np.zeros((STATE_SIZE,1))
+        self.xEst = np.zeros((STATE_SIZE,1))
+        # Covariance.
         self.PEst = np.eye(STATE_SIZE)
-        
+
+        # FIXME: What are those?
         # map observation
         self.obstacle = []
         # radius
@@ -52,12 +45,29 @@ class SLAM_EKF():
 
         # ros topic
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
-        self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
-        self.odom_pub = rospy.Publisher('icp_odom',Odometry,queue_size=3)
-        self.odom_broadcaster = tf.TransformBroadcaster()
-        self.landMark_pub = rospy.Publisher('/landMarks',MarkerArray,queue_size=1)
+        self.landMark_pub = rospy.Publisher('/landmarks',MarkerArray,queue_size=3)
+        # self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
         self.map_pub = rospy.Publisher('/slam_map',OccupancyGrid,queue_size=1)
 
+        # ros parameters
+        self.robot_x = float(rospy.get_param('/slam/robot_x',0))
+        self.robot_y = float(rospy.get_param('/slam/robot_y',0))
+        self.robot_theta = float(rospy.get_param('/slam/robot_theta',0))
+        ## mapping parameters
+        self.map_x_width = float(rospy.get_param('/slam/map_width'))
+        self.map_y_width = float(rospy.get_param('/slam/map_height'))
+        self.map_reso = float(rospy.get_param('/slam/map_resolution'))
+        self.map_cellx_width = int(round(self.map_x_width/self.map_reso))
+        self.map_celly_width = int(round(self.map_y_width/self.map_reso))
+        ## localization parameters 
+        # minimum landmark matches to update.
+        self.min_match = int(rospy.get_param('/slam/min_match',2))
+        # minimum number of points for a landmark cluster
+        self.extraction.landMark_min_pt = int(rospy.get_param('/slam/landMark_min_pt',2))
+        # maximum radius to be identified as landmark
+        self.extraction.radius_max_th = float(rospy.get_param('/slam/radius_max_th',0.4))
+
+    # feed icp landmark instead of laser.
     def laserCallback(self,msg):
         np_msg = self.laserToNumpy(msg)
         lm = self.extraction.process(np_msg)
@@ -105,132 +115,7 @@ class SLAM_EKF():
         angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)
         pc[0:2,:] = np.vstack((np.multiply(np.cos(angle_l),range_l),np.multiply(np.sin(angle_l),range_l)))
         return pc
-
-    def T2u(self,t):
-        dw = math.atan2(t[1,0],t[0,0])
-        u = np.array([[t[0,2],t[1,2],dw]])
-        return u.T
-    
-    def u2T(self,u):
-        w = u[2]
-        dx = u[0]
-        dy = u[1]
-
-        return np.array([
-            [ math.cos(w),-math.sin(w), dx],
-            [ math.sin(w), math.cos(w), dy],
-            [0,0,1]
-        ])
-
-    def lm2pc(self,lm):
-        total_num = len(lm.id)
-        dy = lm.position_y
-        dx = lm.position_x
-        range_l = np.hypot(dy,dx)
-        angle_l = np.arctan2(dy,dx)
-        pc = np.ones((3,total_num))
-        pc[0:2,:] = np.vstack((np.multiply(np.cos(angle_l),range_l),np.multiply(np.sin(angle_l),range_l)))
-        print("mdbg ",total_num)
-        return pc
-
-    def publishResult(self):
-        # tf
-        s = self.xEst.reshape(-1)
-        q = tf.transformations.quaternion_from_euler(0,0,s[2])
-        self.odom_broadcaster.sendTransform((s[0],s[1],0.001),(q[0],q[1],q[2],q[3]),
-                            rospy.Time.now(),"ekf_location","world_base")
-        # odom
-        odom = Odometry()
-        odom.header.stamp = rospy.Time.now()
-        odom.header.frame_id = "world_base"
-
-        odom.pose.pose.position.x = s[0]
-        odom.pose.pose.position.y = s[1]
-        odom.pose.pose.position.z = 0.001
-        odom.pose.pose.orientation.x = q[0]
-        odom.pose.pose.orientation.y = q[1]
-        odom.pose.pose.orientation.z = q[2]
-        odom.pose.pose.orientation.w = q[3]
-
-        self.location_pub.publish(odom)
-
-        s = self.xOdom
-        q = tf.transformations.quaternion_from_euler(0,0,s[2])
-        # odom
-        odom = Odometry()
-        odom.header.stamp = rospy.Time.now()
-        odom.header.frame_id = "world_base"
-
-        odom.pose.pose.position.x = s[0]
-        odom.pose.pose.position.y = s[1]
-        odom.pose.pose.position.z = 0.001
-        odom.pose.pose.orientation.x = q[0]
-        odom.pose.pose.orientation.y = q[1]
-        odom.pose.pose.orientation.z = q[2]
-        odom.pose.pose.orientation.w = q[3]
-
-        self.odom_pub.publish(odom)
         
-        print("mdbg ",self.xEst.shape)
-        # self.laser_pub.publish(self.target_laser)
-        pass
-
-    def publishLandMark(self,msg):
-        # msg = LandMarkSet()
-        if len(msg.id) <= 0:
-            return
-        
-        landMark_array_msg = MarkerArray()
-        for i in range(len(msg.id)):
-            marker = Marker()
-            marker.header.frame_id = "course_agv__hokuyo__link"
-            marker.header.stamp = rospy.Time(0)
-            marker.ns = "lm"
-            marker.id = i
-            marker.type = Marker.SPHERE
-            marker.action = Marker.ADD
-            marker.pose.position.x = msg.position_x[i]
-            marker.pose.position.y = msg.position_y[i]
-            marker.pose.position.z = 0 # 2D
-            marker.pose.orientation.x = 0.0
-            marker.pose.orientation.y = 0.0
-            marker.pose.orientation.z = 0.0
-            marker.pose.orientation.w = 1.0
-            marker.scale.x = 0.2
-            marker.scale.y = 0.2
-            marker.scale.z = 0.2
-            marker.color.a = 0.5 # Don't forget to set the alpha
-            marker.color.r = 0.0
-            marker.color.g = 0.0
-            marker.color.b = 1.0
-            landMark_array_msg.markers.append(marker)
-
-
-        for i in range(((self.xEst.shape[0]-STATE_SIZE)/2)):
-            marker = Marker()
-            marker.header.frame_id = "world_base"
-            marker.header.stamp = rospy.Time(0)
-            marker.ns = "lm"
-            marker.id = i+len(msg.id)
-            marker.type = Marker.SPHERE
-            marker.action = Marker.ADD
-            marker.pose.position.x = self.xEst[STATE_SIZE+i*2,0]
-            marker.pose.position.y = self.xEst[STATE_SIZE+i*2+1,0]
-            marker.pose.position.z = 0 # 2D
-            marker.pose.orientation.x = 0.0
-            marker.pose.orientation.y = 0.0
-            marker.pose.orientation.z = 0.0
-            marker.pose.orientation.w = 1.0
-            marker.scale.x = 0.2
-            marker.scale.y = 0.2
-            marker.scale.z = 0.2
-            marker.color.a = 0.5 # Don't forget to set the alpha
-            marker.color.r = 0.0
-            marker.color.g = 1.0
-            marker.color.b = 0.0
-            landMark_array_msg.markers.append(marker)
-        self.landMark_pub.publish(landMark_array_msg)
-
     def publishMap(self,pmap):
         map_msg = OccupancyGrid()
         map_msg.header.seq = 1
