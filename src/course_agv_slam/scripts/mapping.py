@@ -14,6 +14,7 @@ class Mapping():
         self.maxx =  self.width_x/2.0
         self.miny = -self.width_y/2.0
         self.maxy =  self.width_y/2.0
+        self.origin=np.array([self.xw/2,self.yw/2])
         self.weight=0.02
 
     def update(self, laserPC, center):
@@ -21,18 +22,22 @@ class Mapping():
         laserPC is pointcloud as always, (x,y)=center tuple denotes the robot's position.
         """
         # change the points into integers
-        start=np.round(np.array(center)//self.resolution)
+        start=list(np.round(np.array(center)//self.resolution).astype(int))
         for point in laserPC.T:
-            end=np.round(point//self.resolution)
+            end=list(np.round(point//self.resolution).astype(int))
             pointList=self.line(start,end)
-            # less possibility
-            for p in pointList:
-                if p == end:
-                    continue
-                self.pmap[tuple(p)]-=self.weight
+            # remove obstacle point.
+            if list(pointList[0])==end:
+                np.delete(pointList,0,axis=0)
+            elif list(pointList[-1])==end:
+                np.delete(pointList,-1,axis=0)
+            # origin bias
+            pointList+=self.origin
+            # decrease possibility
+            self.pmap[pointList[:,0],pointList[:,1]]-=self.weight
 
-            # more possibility
-            self.pmap[tuple(end)]+=self.weight
+            # obstacle point more possibility, turns out it needs stronger weight.
+            self.pmap[tuple(np.array(end)+self.origin)]+=self.weight*10
 
         self.pmap[self.pmap>1]=1
         self.pmap[self.pmap<0]=0
@@ -41,35 +46,35 @@ class Mapping():
 
     def line(self,start,end):
         """
-        returns a list including all the points that needs to be updated.
+        returns an n*2 array, each row represents a point that needs to be updated.
         """
         (x1,y1)=start
         (x2,y2)=end
         if x1 == x2: # Special Case: Vertical Line
             if y1 <= y2:
-                return [[x1, y] for y in range(y1, y2 + 1)]
+                return np.array([[x1, y] for y in range(y1, y2 + 1)])
             else:
-                return [[x1, y] for y in range(y2, y1 + 1)]
+                return np.array([[x1, y] for y in range(y2, y1 + 1)])
         elif abs(y2 - y1) <= abs(x2 - x1): # abs(slope) <= 1
             return self.Bresenham(start,end)
-        else: # abs(slope) >= 1: Axis Reverse
-            pointList = self.Bresenham((y1,x1), (y2,x2))
-            return [[p[1], p[0]] for p in pointList]
+        else: # abs(slope) > 1: Axis Reverse
+            return np.fliplr(self.Bresenham((y1,x1), (y2,x2)))
     
     def Bresenham(self,start,end):
         # Parameter of Drawing
         (x1,y1)=start
         (x2,y2)=end        
-        slope = (y2 - y1) / (x2 - x1)
+        slope=float(y2-y1)/(x2 - x1)
         # Initialize
-        p = 2 * slope - 1
+        p=2*slope-1
         [x, y] = [x1, y1]
         # adjust the cases to default situation.
-        if x1 >= x2: # Left-Right Symmetry
+        if x1 >= x2: # start-end Symmetry
             return self.Bresenham(end,start)
         if slope<0:
             pointList = self.Bresenham((x1,-y1), (x2,-y2))
-            return [[p[0], -p[1]] for p in pointList]
+            pointList[:,1]=-pointList[:,1]
+            return pointList
 
         # Real Bresenham Algorithm. Default situation,x1<x2 and slope>=0
         pointList = []
@@ -80,7 +85,7 @@ class Mapping():
             else:
                 [x, y, p] = [x + 1, y + 1, p + 2 * slope - 2]
             pointList.append([x,y])
-        return pointList
+        return np.array(pointList)
 
 def main():
     import rospy
