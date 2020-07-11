@@ -1,7 +1,6 @@
 import math
 import numpy as np
-
-
+from multiprocessing.dummy import Pool
 class Mapping():
     def __init__(self,xw,yw,resolution):
         self.width_x = xw*resolution
@@ -23,26 +22,31 @@ class Mapping():
         """
         # change the points into integers
         start=list(np.round(np.array(center)//self.resolution).astype(int))
-        for point in laserPC.T:
-            end=list(np.round(point//self.resolution).astype(int))
-            pointList=self.line(start,end)
-            # remove obstacle point.
-            if list(pointList[0])==end:
-                np.delete(pointList,0,axis=0)
-            elif list(pointList[-1])==end:
-                np.delete(pointList,-1,axis=0)
-            # origin bias
-            pointList+=self.origin
-            # decrease possibility
-            self.pmap[pointList[:,0],pointList[:,1]]-=self.weight
-
-            # obstacle point more possibility, turns out it needs stronger weight.
-            self.pmap[tuple(np.array(end)+self.origin)]+=self.weight*10
-
+        
+        pool=Pool()
+        pool.map(lambda point: self.traceLight(start,point),laserPC.T)
+        pool.close()
+        pool.join()
         self.pmap[self.pmap>1]=1
         self.pmap[self.pmap<0]=0
-        
         return self.pmap
+
+    def traceLight(self,start,obstacle):
+        end=list(np.round(obstacle//self.resolution).astype(int))
+        pointList=self.line(start,end)
+        # remove obstacle point.
+        if list(pointList[0])==end:
+            np.delete(pointList,0,axis=0)
+        elif list(pointList[-1])==end:
+            np.delete(pointList,-1,axis=0)
+        # origin bias
+        pointList+=self.origin
+        # decrease possibility
+        self.pmap[pointList[:,0],pointList[:,1]]-=self.weight
+
+        # obstacle point more possibility, turns out it needs stronger weight.
+        self.pmap[tuple(np.array(end)+self.origin)]+=self.weight*10
+        return
 
     def line(self,start,end):
         """
