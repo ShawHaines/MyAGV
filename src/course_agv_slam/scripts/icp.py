@@ -23,6 +23,10 @@ class NeighBor:
         self.tar_indices = []
 
 class Localization(object):
+    '''
+    The basic Localizing function class. Father of all sorts of Odometry class like ICP.
+    Includes several utility functions.
+    '''
     def __init__(self,nodeName):
         self.nodeName=nodeName
         # State Vector [x y yaw].T, column vector.

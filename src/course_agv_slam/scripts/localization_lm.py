@@ -16,6 +16,10 @@ from extraction import Extraction
 # from localization import ICPLocalization
 
 class LandmarkLocalization(Localization):
+    '''
+    added landmark publishing features on the basis of Localization.
+    The features include landMark_pub publisher, and its corresponding utility methods.
+    '''
     def __init__(self,nodeName):
         super(LandmarkLocalization,self).__init__(nodeName)
         self.landMark_pub = rospy.Publisher('/landmarks',MarkerArray,queue_size=3)

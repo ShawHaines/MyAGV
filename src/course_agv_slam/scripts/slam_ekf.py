@@ -45,7 +45,6 @@ class SLAM_EKF(LandmarkLocalization,EKF_Landmark):
 
         # ros topic
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
-        self.landMark_pub = rospy.Publisher('/landmarks',MarkerArray,queue_size=3)
         # self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
         self.map_pub = rospy.Publisher('/slam_map',OccupancyGrid,queue_size=1)
 
