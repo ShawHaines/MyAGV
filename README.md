@@ -15,10 +15,6 @@ Improved by Shaw Haines. All rights reserved.
 * [ ] [10.SLAM地图构建与定位](document/10_ekf_slam.md)
 * [ ] [11.栅格地图构建](document/11_mapping.md)
 
-## installation
+## Installation
 
-required:
-* ros-melodic (apt)
-* pynput (pip/conda)
-* matplotlib
-* numpy
+See [INSTALL.md](./INSTALL.md)
