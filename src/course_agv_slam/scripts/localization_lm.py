@@ -2,7 +2,7 @@
 import rospy
 import tf
 import math
-import sys
+# import sys
 from std_msgs.msg import Header,ColorRGBA
 from geometry_msgs.msg import Point,Quaternion,Vector3
 from nav_msgs.srv import GetMap
@@ -11,14 +11,57 @@ from nav_msgs.msg import Odometry
 from visualization_msgs.msg import MarkerArray,Marker
 import numpy as np
 from icp import LandmarkICP,Localization,SubICP
-from ekf_lm import EKF_Landmark
+from ekf_lm import EKF_Landmark,STATE_SIZE,LM_SIZE,Cx
 from extraction import Extraction
 # from localization import ICPLocalization
 
-class LandmarkLocalization(Localization,EKF_Landmark):
-    alpha=3.0
-    def __init__(self,nodeName="ekf_icp"):
+class LandmarkLocalization(Localization):
+    '''
+    added landmark publishing features on the basis of Localization.
+    The features include landMark_pub publisher, and its corresponding utility methods.
+    '''
+    def __init__(self,nodeName):
         super(LandmarkLocalization,self).__init__(nodeName)
+        self.landMark_pub = rospy.Publisher('/landmarks',MarkerArray,queue_size=3)
+
+    def publishLandMark(self,msg,color="b",namespace="laser",frame="course_agv__hokuyo__link"):
+        '''
+        msg=2*n np array.
+        '''
+        # if len(msg) <= 0:
+        #     return
+        
+        landMark_array = MarkerArray()
+        landMark_array.markers=[self.toMarker(x,i,color,namespace,frame) for i,x in enumerate(msg.T)]
+        self.landMark_pub.publish(landMark_array)
+
+    def toMarker(self,pair,id=0,color="b",namespace="laser",frame="course_agv__hokuyo__link"):
+        '''
+        color can be "r","g","b"
+        '''
+        # order: R,G,B,Alpha. Don't forget to set the alpha.
+        colorDict={
+            "r":[1,0,0,1.0], "R":[1,0,0,1.0],
+            "g":[0,1,0,1.0], "G":[0,1,0,1.0],
+            "b":[0,0,1,1.0], "B":[0,0,1,1.0],
+        }
+        marker = Marker(header=Header(id,rospy.Time(0),frame))
+        marker.ns = namespace
+        marker.id = id
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        marker.pose.position=Point(pair[0],pair[1],0)
+        marker.pose.orientation=Quaternion(0,0,0,1)
+        marker.scale=Vector3(0.2,0.2,0.2)
+        # * is a very useful grammar when passing arguments! 
+        # expands the list or tuple in order. 
+        marker.color=ColorRGBA(*colorDict[color])
+        return marker
+
+class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
+    alpha=3.0  # factor in estimating covariance.
+    def __init__(self,nodeName="ekf_icp"):
+        super(EKF_Landmark_Localization,self).__init__(nodeName)
 
         self.icp = SubICP()
         self.extraction = Extraction()
@@ -30,10 +73,10 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         self.laser_interval=5
 
         # State Vector [x y yaw].T, column vector.
-        # self.xOdom = np.zeros((3,1))
-        self.xEst = np.zeros((3,1))
+        # self.xOdom = np.zeros((STATE_SIZE,1))
+        self.xEst = np.zeros((STATE_SIZE,1))
         # Covariance.
-        self.PEst = np.eye(3)
+        self.PEst = np.eye(STATE_SIZE)
         
         # init map
         # map observation
@@ -42,7 +85,6 @@ class LandmarkLocalization(Localization,EKF_Landmark):
 
         # ros topic
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
-        self.landMark_pub = rospy.Publisher('/landmarks',MarkerArray,queue_size=3)
         # self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
         
         # parameters from launch file.
@@ -134,40 +176,6 @@ class LandmarkLocalization(Localization,EKF_Landmark):
         u=self.icp.xEst-state0
         return u
 
-    def publishLandMark(self,msg,color="b",namespace="laser",frame="course_agv__hokuyo__link"):
-        '''
-        msg=2*n np array.
-        '''
-        # if len(msg) <= 0:
-        #     return
-        
-        landMark_array = MarkerArray()
-        landMark_array.markers=[self.toMarker(x,i,color,namespace,frame) for i,x in enumerate(msg.T)]
-        self.landMark_pub.publish(landMark_array)
-
-    def toMarker(self,pair,id=0,color="b",namespace="laser",frame="course_agv__hokuyo__link"):
-        '''
-        color can be "r","g","b"
-        '''
-        # order: R,G,B,Alpha. Don't forget to set the alpha.
-        colorDict={
-            "r":[1,0,0,1.0], "R":[1,0,0,1.0],
-            "g":[0,1,0,1.0], "G":[0,1,0,1.0],
-            "b":[0,0,1,1.0], "B":[0,0,1,1.0],
-        }
-        marker = Marker(header=Header(id,rospy.Time(0),frame))
-        marker.ns = namespace
-        marker.id = id
-        marker.type = Marker.SPHERE
-        marker.action = Marker.ADD
-        marker.pose.position=Point(pair[0],pair[1],0)
-        marker.pose.orientation=Quaternion(0,0,0,1)
-        marker.scale=Vector3(0.2,0.2,0.2)
-        # * is a very useful grammar when passing arguments! 
-        # expands the list or tuple in order. 
-        marker.color=ColorRGBA(*colorDict[color])
-        return marker
-
     # EKF virtual function.
     def observation_model(self,xEst):
         '''
@@ -180,7 +188,7 @@ class LandmarkLocalization(Localization,EKF_Landmark):
 
     def estimate(self,xEst,PEst,z,u):
         G,Fx=self.jacob_motion(xEst,u)
-        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(self.Cx,Fx))
+        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(Cx,Fx))
         
         # Predict
         xPredict=self.odom_model(xEst,u)
@@ -218,7 +226,7 @@ class LandmarkLocalization(Localization,EKF_Landmark):
 
 def main():
     rospy.init_node('localization_node')
-    l = LandmarkLocalization()
+    l = EKF_Landmark_Localization()
     rospy.spin()
     pass
 

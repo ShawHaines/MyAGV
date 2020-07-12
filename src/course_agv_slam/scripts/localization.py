@@ -9,7 +9,7 @@ from std_msgs.msg import Header
 import numpy as np
 # wow!
 from icp import Localization,SubICP
-from ekf import EKF
+from ekf import EKF,Q,R
 import sys
 
 class ICPLocalization(Localization,EKF):
@@ -108,7 +108,7 @@ class ICPLocalization(Localization,EKF):
         u=self.calc_odometry(msg)
      
         # z is the absolute states.
-        z=self.calc_map_observation(msg)
+        z=self.icp.laserToNumpy(msg)
         # xEst is both predicted and updated in the ekf.
         self.xEst,self.PEst=self.estimate(self.xEst,self.PEst,z,u)
         self.publishResult()
@@ -191,7 +191,29 @@ class ICPLocalization(Localization,EKF):
     
     # EKF virtual function.
     def observation_model(self,x):
-        return self.calc_map_observation(self.laserEstimation(x))
+        return self.icp.laserToNumpy(self.laserEstimation(x))
+
+    def estimate(self, xEst, PEst, z, u):
+        G,Fx=self.jacob_motion(xEst,u)
+        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(Q,Fx))
+        
+        # Predict
+        xPredict=self.odom_model(xEst,u)
+        zEst=self.observation_model(xPredict)
+        # FIXME: the dz is in self frame!
+        dz=self.T2u(self.icp.processICP(z,zEst,initialT=np.identity(3)))
+        dz=np.dot(tf.transformations.euler_matrix(0,0,xPredict[2,0])[0:3,0:3],dz)
+        print("dz=\n{}\n".format(dz))
+        m=self.jacob_h()
+
+        # Karman factor. Universal formula.
+        K=np.dot(np.dot(covariance,m.T),np.linalg.inv(np.dot(m,np.dot(covariance,m.T))+R))
+
+        # Update
+        xEst=xPredict+np.dot(K,dz)
+        PEst=covariance-np.dot(K,np.dot(m,covariance))
+
+        return xEst, PEst
 
 def main():
     rospy.init_node('localization_node')

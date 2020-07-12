@@ -11,6 +11,9 @@ class Extraction():
         self.landMark_min_pt = int(rospy.get_param('"/extraction/landMark_min_pt',2))
 
     def process(self,msg,trust = False):
+        """
+        returns pointcloud instead of Landmark objects.
+        """
         labels = []
         # I don't know what trust are, just ignoring them...
         ranges=np.array(msg.ranges)

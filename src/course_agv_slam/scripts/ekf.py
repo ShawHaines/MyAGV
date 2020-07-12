@@ -2,6 +2,10 @@ import math
 import numpy as np
 from abc import ABCMeta, abstractmethod
 
+STATE_SIZE = 3  # State size [x,y,yaw]
+LM_SIZE = 2  # LM state size [x,y]
+INF = 1e6
+
 # Covariance for EKF simulation
 Q = np.diag([
     0.2,  # variance of location on x-axis
@@ -48,10 +52,10 @@ class EKF(object):
         x_t=G*x_{t-1}+Fx*u
         """
 
-        # the jacoby for x
-        G=np.identity(3)
-        # the jacoby for u
-        Fx=np.identity(3)
+        # the Jacobian for x
+        G=np.identity(STATE_SIZE)
+        # the Jacobian for u
+        Fx=np.identity(STATE_SIZE)
         return (G,Fx)
 
     @abstractmethod # virtual.

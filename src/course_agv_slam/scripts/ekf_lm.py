@@ -1,16 +1,13 @@
 import math
 import numpy as np
 import tf
-from ekf import EKF
+from ekf import EKF,STATE_SIZE,LM_SIZE,INF
 
 M_DIST_TH = 0.6  # Threshold of Mahalanobis distance for data association.
-STATE_SIZE = 3  # State size [x,y,yaw]
-LM_SIZE = 2  # LM state size [x,y]
+# EKF state covariance
+Cx = np.diag([0.35, 0.35, np.deg2rad(15.0)]) ** 2
 
 class EKF_Landmark(EKF):
-    # EKF state covariance
-    Cx = np.diag([0.35, 0.35, np.deg2rad(15.0)]) ** 2
-
     def __init__(self):
         super(EKF_Landmark,self).__init__()
 
@@ -72,3 +69,42 @@ class EKF_Landmark(EKF):
         normalize the angle in range [-pi,pi]
         '''
         return (angle + math.pi) % (2 * math.pi) - math.pi
+
+class EKF_SLAM(EKF_Landmark):
+    def __init__(self):
+        super(EKF_SLAM,self).__init__()
+
+    def jacob_motion(self,xEst,lEst,u):
+        """
+        Jacobian of Odom Model
+        y = [x,y,w,...,xi,yi,...]T
+        u = [ox,oy,ow]T
+        returns (G,Fx)
+        x_t=G*x_{t-1}+Fx*u
+        """
+        yLength=np.size(lEst,1)+STATE_SIZE
+        # the Jacobian for x
+        G=np.identity(yLength)
+        # the Jacobian for u
+        Fx=np.zeros_like(G)
+        Fx[0:STATE_SIZE,0:STATE_SIZE]=np.identity(STATE_SIZE)
+        return (G,Fx)
+
+    def jacob_h(self, tar, neighbour, x):
+        # TODO: derive the formula.
+        '''
+        the Jacobian of observation model.
+        '''
+        length=len(neighbour.tar_indices)
+        if length==0:
+            print("Error: no matching points!")
+            return 0
+        rotation=tf.transformations.euler_matrix(0,0,x[2,0])[0:2,0:2]
+        # the yaw(theta) derivative of rotation. [[-sin,cos],[-cos,-sin]]
+        derivativeR=tf.transformations.euler_matrix(0,0,x[2,0]+math.pi/2)[0:2,0:2]
+        z=tar[:,neighbour.tar_indices]
+        partialTheta=np.dot(np.transpose(derivativeR),z-x[0:2,0].reshape(2,1))
+        partialTheta=np.vstack(np.hsplit(partialTheta,length))
+        H=np.repeat(-np.transpose(rotation),length,axis=0)
+        H=np.hstack((H,partialTheta))
+        return H

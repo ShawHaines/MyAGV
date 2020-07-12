@@ -9,6 +9,9 @@ Panels:
         - /Odometry1/Shape1
         - /Odometry3/Shape1
         - /MarkerArray1
+        - /Map2
+        - /Odometry4
+        - /Odometry4/Shape1
       Splitter Ratio: 0.5
     Tree Height: 549
   - Class: rviz/Selection
@@ -84,8 +87,6 @@ Visualization Manager:
           Value: true
         course_agv__right_wheel:
           Value: true
-        ekf_icp:
-          Value: true
         icp_odom:
           Value: true
         map:
@@ -93,6 +94,8 @@ Visualization Manager:
         robot_base:
           Value: true
         robot_chassis:
+          Value: true
+        slam_ekf:
           Value: true
         world_base:
           Value: true
@@ -103,8 +106,6 @@ Visualization Manager:
       Show Names: false
       Tree:
         world_base:
-          ekf_icp:
-            {}
           icp_odom:
             {}
           map:
@@ -119,6 +120,8 @@ Visualization Manager:
                 {}
               robot_chassis:
                 {}
+          slam_ekf:
+            {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -312,6 +315,50 @@ Visualization Manager:
         paired: true
       Queue Size: 300
       Value: true
+    - Alpha: 0.5
+      Class: rviz/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: true
+      Name: Map
+      Topic: /slam_map
+      Unreliable: false
+      Use Timestamp: false
+      Value: true
+    - Angle Tolerance: 0.10000000149011612
+      Class: rviz/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: true
+      Enabled: true
+      Keep: 100
+      Name: Odometry
+      Position Tolerance: 0.10000000149011612
+      Shape:
+        Alpha: 0.699999988079071
+        Axes Length: 1
+        Axes Radius: 0.10000000149011612
+        Color: 0; 255; 0
+        Head Length: 0.15000000596046448
+        Head Radius: 0.05000000074505806
+        Shaft Length: 0.30000001192092896
+        Shaft Radius: 0.009999999776482582
+        Value: Arrow
+      Topic: /slam_ekf
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -340,25 +387,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 12.553628921508789
+      Distance: 12.251279830932617
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.13873055577278137
-        Y: 1.2473617792129517
-        Z: 2.062521457672119
+        X: -0.6256198883056641
+        Y: 1.0945333242416382
+        Z: 1.8821830749511719
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.965397834777832
+      Pitch: 1.1753979921340942
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.3004231452941895
+      Yaw: 1.4872630834579468
     Saved: ~
 Window Geometry:
   Displays:
@@ -376,5 +423,6 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 642
-  Y: 27
+  X: 667
+  Y: 30
+s
