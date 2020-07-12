@@ -82,7 +82,7 @@ class EKF_SLAM(EKF_Landmark):
         returns (G,Fx)
         x_t=G*x_{t-1}+Fx*u
         """
-        yLength=np.size(lEst,1)+STATE_SIZE
+        yLength=2*np.size(lEst,1)+STATE_SIZE
         # the Jacobian for x
         G=np.identity(yLength)
         # the Jacobian for u
@@ -90,21 +90,28 @@ class EKF_SLAM(EKF_Landmark):
         Fx[0:STATE_SIZE,0:STATE_SIZE]=np.identity(STATE_SIZE)
         return (G,Fx)
 
-    def jacob_h(self, tar, neighbour, x):
+    def jacob_h(self, landmark, neighbour, x):
         # TODO: derive the formula.
         '''
         the Jacobian of observation model.
         '''
-        length=len(neighbour.tar_indices)
-        if length==0:
+        zSize=len(neighbour.tar_indices)
+        lSize=np.size(landmark,1)
+        if zSize==0:
             print("Error: no matching points!")
             return 0
         rotation=tf.transformations.euler_matrix(0,0,x[2,0])[0:2,0:2]
         # the yaw(theta) derivative of rotation. [[-sin,cos],[-cos,-sin]]
         derivativeR=tf.transformations.euler_matrix(0,0,x[2,0]+math.pi/2)[0:2,0:2]
-        z=tar[:,neighbour.tar_indices]
+        z=landmark[:,neighbour.tar_indices]
         partialTheta=np.dot(np.transpose(derivativeR),z-x[0:2,0].reshape(2,1))
-        partialTheta=np.vstack(np.hsplit(partialTheta,length))
-        H=np.repeat(-np.transpose(rotation),length,axis=0)
+        partialTheta=np.vstack(np.hsplit(partialTheta,zSize))
+        H=np.repeat(-np.transpose(rotation),zSize,axis=0)
         H=np.hstack((H,partialTheta))
-        return H
+        # landmark part
+        Hl=np.zeros((zSize,lSize))
+        Hl[neighbour.src_indices,neighbour.tar_indices]=1
+        # Excellent usage on kronecker multiplying!
+        Hl=np.kron(Hl,rotation.T)
+
+        return np.hstack((H,Hl))

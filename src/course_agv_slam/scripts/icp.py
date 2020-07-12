@@ -226,6 +226,8 @@ class ICPBase(Localization):
         '''
         guarantees that src and tar won't change.
         '''
+        if np.size(tar)==0:
+            return NeighBor()
         # find the pairing strategy between src and tar.
         neighbour = NeighBor()
         length=np.size(src,1)
