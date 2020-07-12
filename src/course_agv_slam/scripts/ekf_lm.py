@@ -87,8 +87,10 @@ class EKF_SLAM(EKF_Landmark):
         G=np.identity(yLength)
         # the Jacobian for u
         Fx=np.zeros_like(G)
+        expandedCx=np.zeros_like(G)
         Fx[0:STATE_SIZE,0:STATE_SIZE]=np.identity(STATE_SIZE)
-        return (G,Fx)
+        expandedCx[0:STATE_SIZE,0:STATE_SIZE]=Cx
+        return (G,Fx,expandedCx)
 
     def jacob_h(self, landmark, neighbour, x):
         # TODO: derive the formula.

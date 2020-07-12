@@ -13,7 +13,7 @@ from localization_lm import LandmarkLocalization
 from ekf_lm import EKF_SLAM,STATE_SIZE,LM_SIZE,Cx,INF
 from extraction import Extraction
 from mapping import Mapping
-import scipy.linalg
+import scipy.linalg as scilinalg
 # import sys
 
 MAX_LASER_RANGE = 30
@@ -135,8 +135,9 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
 
     def estimate(self,xEst,lEst,PEst,z,u):
 
-        G,Fx=self.jacob_motion(xEst,lEst,u)
-        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(Cx,Fx))
+        G,Fx,expandedCx=self.jacob_motion(xEst,lEst,u)
+
+        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(expandedCx,Fx))
         
         # Predict
         xPredict=self.odom_model(xEst,u)
@@ -149,13 +150,14 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         zPredict=zEst[:,neighbour.tar_indices]
         self.publishLandMark(zPredict,color="g",namespace="paired",frame=self.nodeName)
 
-        # where the new landmarks are generated. This is somewhat arbitary.
-        spawnPosition=np.array([[0,0]]).T
-        missedIndices=sorted(list(set(range(np.size(z,1)))-set(neighbour.src_indices)))
-        length=len(neighbour.src_indices)
-        missed=len(missedIndices)
         lSize=np.size(lEst,1)
         zSize=np.size(z,1)
+        # where the new landmarks are generated. This is somewhat arbitary.
+        spawnPosition=np.array([[0,0]]).T
+        # how many observed landmarks are missed, how many new ones will be added.
+        missedIndices=sorted(list(set(range(zSize))-set(neighbour.src_indices)))
+        paired=len(neighbour.src_indices)
+        missed=len(missedIndices)
 
         neighbour.src_indices+=missedIndices
         # the newly-added landmarks
@@ -164,22 +166,24 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         zObserved=z[:,neighbour.src_indices]
         # new lEst
         newL=np.hstack((lEst,np.repeat(spawnPosition,missed,axis=1)))
-        zPredict=np.hstack((zPredict,np.repeat(self.observation_model(xPredict,spawnPosition),missed,axis=1)))
+        zEst=self.observation_model(xPredict,newL)
+        zPredict=zEst[:,neighbour.tar_indices]
+        # zPredict=np.hstack((zPredict,np.repeat(self.observation_model(xPredict,spawnPosition),missed,axis=1)))
         # newSize=STATE_SIZE+LM_SIZE*np.size(newL,1)
         # newP=np.zeros((newSize,newSize))
         # newP[0:np.size(PEst,0),0:np.size(PEst,1)]=PEst
         # newP[np.size(PEst,0):-1,np.size(PEst,1):-1]=np.diag([INF]*LM_SIZE*missed)
         # block is so powerful!
-        covariance=scipy.linalg.block_diag(covariance,np.diag([INF]*LM_SIZE*missed))
-
+        covariance=scilinalg.block_diag(covariance,np.diag([INF]*LM_SIZE*missed))
+        
         yPredict=self.XLtoY(xPredict,newL)
 
-        variance=self.alpha/(length+self.alpha)
-        print("\n\nlength: {} variance: {}".format(length,variance))
-        if length<self.min_match:
-            print("Matching points are too little to execute update.")
-            #  only update according to the prediction stage.
-            return xPredict,newL,covariance
+        variance=self.alpha/(paired+self.alpha)
+        print("\n\nlength: {} variance: {}".format(paired,variance))
+        # if length<self.min_match:
+        #     print("Matching points are too little to execute update.")
+        #     #  only update according to the prediction stage.
+        #     return xPredict,newL,covariance
 
         m=self.jacob_h(newL,neighbour,xPredict)
 
@@ -227,7 +231,7 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
 
     def YtoXL(self,y):
         x,l=np.vsplit(y,[STATE_SIZE])
-        l=np.hstack(np.vsplit(np.size(l)/LM_SIZE))
+        l=np.hstack(np.vsplit(l,np.size(l)/LM_SIZE))
         return x,l
 
 def main():

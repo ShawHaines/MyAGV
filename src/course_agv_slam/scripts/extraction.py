@@ -7,7 +7,7 @@ import rospy
 class Extraction():
     def __init__(self):
         self.range_threshold = float(rospy.get_param('/extraction/range_threshold',1.0))
-        self.radius_max_th = float(rospy.get_param('/extraction/radius_max_th',0.3))
+        self.radius_max_th = float(rospy.get_param('/extraction/radius_max_th',0.4))
         self.landMark_min_pt = int(rospy.get_param('"/extraction/landMark_min_pt',2))
 
     def process(self,msg,trust = False):
