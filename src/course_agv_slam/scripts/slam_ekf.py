@@ -23,20 +23,8 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
     def __init__(self,nodeName="slam_ekf"):
         super(SLAM_Localization,self).__init__(nodeName)
 
-        # ros parameters
-        self.robot_x = float(rospy.get_param('/slam/robot_x',0))
-        self.robot_y = float(rospy.get_param('/slam/robot_y',0))
-        self.robot_theta = float(rospy.get_param('/slam/robot_theta',0))
-        ## mapping parameters
-        self.map_x_width = float(rospy.get_param('/slam/map_width',25))
-        self.map_y_width = float(rospy.get_param('/slam/map_height',25))
-        self.map_reso = float(rospy.get_param('/slam/map_resolution',0.1))
-        self.map_cellx_width = int(round(self.map_x_width/self.map_reso))
-        self.map_celly_width = int(round(self.map_y_width/self.map_reso))
-        
         self.icp = SubICP()
         self.extraction = Extraction()
-        self.mapping = Mapping(self.map_cellx_width,self.map_celly_width,self.map_reso)
 
         self.src_pc = None
         self.isFirstScan = True
@@ -50,6 +38,7 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         self.PEst = np.eye(STATE_SIZE)
         # landMark Estimation. Like former self.tar_pc
         self.lEst = np.zeros((LM_SIZE,0)) # lEst should be of 2*N size
+
         # FIXME: What are those?
         # map observation
         self.obstacle = []
@@ -59,7 +48,6 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         # ros topic
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
         # self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
-        self.map_pub = rospy.Publisher('/slam_map',OccupancyGrid,queue_size=1)
         
         ## localization parameters 
         # minimum landmark matches to update.
@@ -96,20 +84,7 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         self.xEst,self.lEst,self.PEst=self.estimate(self.xEst,self.lEst,self.PEst,z,u)
 
         self.publishResult()
-
-        # np_msg = self.laserToNumpy(msg)
-        # lm = self.extraction.process(np_msg)
-        # # u = self.calc_odometry(self.lm2pc(lm))
-        # u = self.calc_odometry(np_msg)
-        # z = self.observation(lm)
-        # self.xEst,self.PEst = self.ekf.estimate(self.xEst,self.PEst,z,u)
-
-        # # FIXME
-        # pointCloud = self.u2T(self.xEst[0:3]).dot(np_msg)
-        pointCloud=np.dot(tf.transformations.euler_matrix(0,0,self.xEst[2,0])[0:2,0:2],self.icp.laserToNumpy(msg))+self.xEst[0:2]
-        pmap = self.mapping.update(pointCloud, self.xEst[0:2].reshape(-1))
-        self.publishMap(pmap)
-        pass
+        return
 
     def calc_odometry(self,msg):
         '''
@@ -200,28 +175,6 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         PEst=covariance-np.dot(K,np.dot(m,covariance))
         xEst,lEst=self.YtoXL(yEst)
         return xEst,lEst,PEst
-
-    def publishMap(self,pmap):
-        map_msg = OccupancyGrid()
-        map_msg.header.seq = 1
-        map_msg.header.stamp = rospy.Time().now()
-        map_msg.header.frame_id = "map"
-
-        map_msg.info.map_load_time = rospy.Time().now()
-        map_msg.info.resolution = self.map_reso
-        map_msg.info.width = self.map_cellx_width
-        map_msg.info.height = self.map_celly_width
-        map_msg.info.origin.position.x = -self.map_cellx_width*self.map_reso/2.0
-        map_msg.info.origin.position.y = -self.map_celly_width*self.map_reso/2.0
-        map_msg.info.origin.position.z = 0
-        map_msg.info.origin.orientation.x = 0
-        map_msg.info.origin.orientation.y = 0
-        map_msg.info.origin.orientation.z = 0
-        map_msg.info.origin.orientation.w = 1.0
-
-        map_msg.data = list(pmap.T.reshape(-1)*100)
-        
-        self.map_pub.publish(map_msg)
 
     def XLtoY(self,x,l):
         # split y (2*N) to 2N*1
