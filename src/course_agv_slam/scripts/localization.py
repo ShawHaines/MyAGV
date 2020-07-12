@@ -200,7 +200,9 @@ class ICPLocalization(Localization,EKF):
         # Predict
         xPredict=self.odom_model(xEst,u)
         zEst=self.observation_model(xPredict)
+        # FIXME: the dz is in self frame!
         dz=self.T2u(self.icp.processICP(z,zEst,initialT=np.identity(3)))
+        dz=np.dot(tf.transformations.euler_matrix(0,0,xPredict[2,0])[0:3,0:3],dz)
         print("dz=\n{}\n".format(dz))
         m=self.jacob_h()
 
