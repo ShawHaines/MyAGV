@@ -4,6 +4,7 @@ import math
 import numpy as np
 import rospy
 import tf
+import gc
 from nav_msgs.msg import OccupancyGrid,Odometry
 from sensor_msgs.msg import LaserScan
 from threading import Lock
@@ -63,6 +64,7 @@ class Mapping():
         pc=np.dot(tf.transformations.euler_matrix(0,0,yaw)[0:2,0:2],pc)+translation.reshape(2,1)
         self.update(pc,translation)
         self.publishMap()
+        gc.collect()
         return
 
     def publishMap(self):
