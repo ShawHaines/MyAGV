@@ -12,7 +12,6 @@ from icp import LandmarkICP,SubICP,NeighBor
 from localization_lm import LandmarkLocalization
 from ekf_lm import EKF_SLAM,STATE_SIZE,LM_SIZE,Cx,INF
 from extraction import Extraction
-from mapping import Mapping
 import scipy.linalg as scilinalg
 # import sys
 
@@ -26,16 +25,15 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         self.icp = SubICP()
         self.extraction = Extraction()
 
-        self.src_pc = None
         self.isFirstScan = True
         self.laser_count=0
         # interval
-        self.laser_interval=5
+        self.laser_interval=10
         # State Vector [x y yaw].T, column vector.
         # self.xOdom = np.zeros((STATE_SIZE,1))
         self.xEst = np.zeros((STATE_SIZE,1))
-        # Covariance.
-        self.PEst = np.eye(STATE_SIZE)
+        # Covariance. Initial is very certain.
+        self.PEst = np.zeros((STATE_SIZE,STATE_SIZE))
         # landMark Estimation. Like former self.tar_pc
         self.lEst = np.zeros((LM_SIZE,0)) # lEst should be of 2*N size
 
@@ -43,7 +41,7 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         # map observation
         self.obstacle = []
         # radius
-        self.obstacle_r = 0.35
+        self.obstacle_r = 0.35**2
 
         # ros topic
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
@@ -168,7 +166,7 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         print("delta z: \n{}\n".format(zObserved-zPredict))
         
         # Karman factor. Universal formula.
-        K=np.dot(np.dot(covariance,m.T),np.linalg.inv(np.dot(m,np.dot(covariance,m.T))+np.diag([variance]*2*zSize)))
+        K=np.dot(np.dot(covariance,m.T),np.linalg.inv(np.dot(m,np.dot(covariance,m.T))+np.diag([self.obstacle_r]*2*zSize)))
 
         # Update
         fix=np.dot(K,zObserved-zPredict)
