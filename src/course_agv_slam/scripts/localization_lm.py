@@ -88,8 +88,8 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
         # self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
         
         # parameters from launch file.
-        # minimum landmark matches to update.
-        self.min_match = int(rospy.get_param('/localization/min_match',2))
+        # minimum landmark matches to update. Actually even 1 point is acceptable.
+        self.min_match = int(rospy.get_param('/localization/min_match',1))
         # minimum number of points for a landmark cluster
         self.extraction.landMark_min_pt = int(rospy.get_param('/localization/landMark_min_pt',2))
         # maximum radius to be identified as landmark
@@ -202,6 +202,7 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
         length=len(neighbour.src_indices)
         variance=self.alpha/(length+self.alpha)
         print("\n\nlength: {} variance: {}".format(length,variance))
+        # turns out no matter how little the information is, it is of value somewhat. min_match can be set to 1.
         if length<self.min_match:
             print("Matching points are too little to execute update.")
             #  only update according to the prediction stage.

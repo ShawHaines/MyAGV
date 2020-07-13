@@ -7,7 +7,7 @@
 		<param name="range_threshold" value="0.5"/>
 		<param name="radius_max_th" value="0.4"/>
 		<param name="landMark_min_pt" value="2"/>
-		<param name="min_match" value="2"/>
+		<param name="min_match" value="1"/>
 	</node>
 	<node pkg="course_agv_slam" type="wheel.py" name="wheel" output="screen" launch-prefix="xterm -e"/>
 
