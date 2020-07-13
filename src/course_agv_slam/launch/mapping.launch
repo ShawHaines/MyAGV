@@ -4,16 +4,17 @@
     <!-- <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" /> -->
 
 
-	<node pkg="course_agv_slam" type="mapping.py" name="mapping" output="screen">
+	<node pkg="course_agv_slam" type="bayes_mapping.py" name="mapping" output="screen">
         <param name="map_width" value="25.0"/>
         <param name="map_height" value="25.0"/>
         <param name="map_resolution" value="0.1"/>
         <param name="range_threshold" value="0.5"/>
+        <param name="odometry_interval" value="1"/>
         <!-- change it according to the frame you are using -->
         <param name="frame_name" value="ekf_icp"/>
 	</node>
     <!-- change it according to the localizing system you want to use. -->
-    <include file="$(find course_agv_slam)/launch/localization.launch"/> 
+    <include file="$(find course_agv_slam)/launch/localization_lm.launch"/> 
 
     <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find course_agv_slam)/launch/course_agv.rviz" /> -->
 </launch>

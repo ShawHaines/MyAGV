@@ -4,21 +4,20 @@ import math
 import numpy as np
 import rospy
 import tf
-# import gc 
 from nav_msgs.msg import OccupancyGrid,Odometry
 from sensor_msgs.msg import LaserScan
 from threading import Lock
 from geometry_msgs.msg import Quaternion
 from icp import toList,toArray
 
-class Mapping():
-    # FIXME: memory leaking!
+class MappingBase(object):
     def __init__(self):
         ## mapping parameters
         self.width_x = float(rospy.get_param('/mapping/map_width',25))
         self.width_y = float(rospy.get_param('/mapping/map_height',25))
         self.resolution = float(rospy.get_param('/mapping/map_resolution',0.1))
         self.frameName= rospy.get_param('/mapping/frame_name',"ekf_icp")
+        self.odometryInterval=int(rospy.get_param('/mappping/odometry_interval',1))
 
         # int, unit is cells.
         self.xw = int(round(self.width_x/self.resolution))
@@ -34,12 +33,10 @@ class Mapping():
         self.maxy =  self.width_y/2.0
         # origin bias
         self.origin=np.array([self.xw/2,self.yw/2])
-        # ray tracing update factor
-        self.weight=0.02
 
         self.lock=Lock()
-        self.odometryInterval=5
         self.odometryCount=0
+
         # ros topic
         self.map_pub = rospy.Publisher('/slam_map',OccupancyGrid,queue_size=1)
         # only admits newest laser message.
@@ -58,20 +55,20 @@ class Mapping():
 
     def odometryCallback(self,msg):
         # print("received new odometry!!!\n")
+        self.lock.acquire()
         self.odometryCount+=1
         if self.odometryCount<self.odometryInterval:
+            self.lock.release()
             return
         self.odometryCount=0
 
-        self.lock.acquire()
         pc=self.laserToNumpy(self.laser)
-        self.lock.release()
         yaw=tf.transformations.euler_from_quaternion(toList(msg.pose.pose.orientation))[2]
         translation=toArray(msg.pose.pose.position)[0:2]
         pc=np.dot(tf.transformations.euler_matrix(0,0,yaw)[0:2,0:2],pc)+translation.reshape(2,1)
         self.update(pc,translation)
         self.publishMap()
-        # gc.collect() # gc can't save it...
+        self.lock.release()
         return
 
     def publishMap(self):
@@ -100,13 +97,18 @@ class Mapping():
     def update(self, laserPC, center):
         """
         laserPC is pointcloud as always, (x,y)=center tuple denotes the robot's position.
+        Use simplest mapping method.
         """
-        # TODO: use Bayes odds updating formula.
         # change the points into integers
-        start=list(np.round(np.array(center)//self.resolution).astype(int))
+        start=list(np.round(np.array(center)/self.resolution).astype(int))
         for point in laserPC.T:
             end=list(np.round(point//self.resolution).astype(int))
             pointList=self.line(start,end)
+            # FIXME: turns out this line of code is necessary for not leaking...
+            # the failure at the same location might be because
+            #  at that location a ray is projected on the same grid as the robot...
+            if np.size(pointList)==0:
+                return
             # remove obstacle point.
             if list(pointList[0])==end:
                 np.delete(pointList,0,axis=0)
@@ -115,15 +117,9 @@ class Mapping():
             # origin bias
             pointList+=self.origin
             # decrease possibility
-            self.pmap[pointList[:,0],pointList[:,1]]-=self.weight
-
-            # obstacle point more possibility, turns out it needs stronger weight.
-            self.pmap[tuple(np.array(end)+self.origin)]+=self.weight*10
-
-        self.pmap[self.pmap>1]=1
-        self.pmap[self.pmap<0]=0
-        
-        return self.pmap
+            self.pmap[pointList[:,0],pointList[:,1]]=0
+            self.pmap[tuple(np.array(end)+self.origin)]=1
+        return
 
     def line(self,start,end):
         """
@@ -222,7 +218,7 @@ def main():
         pass
     """
     rospy.init_node("mapping")
-    mapping=Mapping()
+    mappingBase=MappingBase()
     rospy.spin()
 
 if __name__ == '__main__':
