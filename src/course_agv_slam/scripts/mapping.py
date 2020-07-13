@@ -11,6 +11,7 @@ from geometry_msgs.msg import Quaternion
 from icp import toList,toArray
 
 class Mapping():
+    # FIXME: memory leaking!
     def __init__(self):
         ## mapping parameters
         self.width_x = float(rospy.get_param('/mapping/map_width',25))

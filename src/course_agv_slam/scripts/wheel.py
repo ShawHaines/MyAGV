@@ -73,13 +73,14 @@ class WheelOdometry(object):
         displace=np.array([dx,dy,0,1])
         # be careful to realize what this euler matrix is!
         displace=np.dot(tf.transformations.euler_matrix(euler[0],euler[1],euler[2]),displace)
-        print("dx {} dy {} dtheta {}".format(dx,dy,dtheta))
+        # print("dx {} dy {} dtheta {}".format(dx,dy,dtheta))
         self.odometry.pose.pose.position.x+=displace[0]
         self.odometry.pose.pose.position.y+=displace[1]
         euler[2]+=dtheta
-        self.odometry.pose.pose.orientation=toQuaternion(tf.transformations.quaternion_from_euler(euler[0],euler[1],euler[2]))
-        print("position {}".format(self.odometry.pose.pose.position))
-        print("orientation {}".format(euler))
+        # compact grammar
+        self.odometry.pose.pose.orientation=toQuaternion(tf.transformations.quaternion_from_euler(*euler))
+        # print("position {}".format(self.odometry.pose.pose.position))
+        # print("orientation {}".format(euler))
         self.odometry.header.stamp=self.jointstates.header.stamp
         self.odometry.header.seq  =self.jointstates.header.seq
         self.lock.release()
