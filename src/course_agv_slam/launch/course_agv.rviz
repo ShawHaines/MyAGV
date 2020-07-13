@@ -224,7 +224,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 100
+      Keep: 300
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Shape:
@@ -258,7 +258,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 100
+      Keep: 300
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Shape:
@@ -292,7 +292,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 100
+      Keep: 300
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Shape:
@@ -388,16 +388,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 19.966938018798828
+      Distance: 25.046527862548828
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.21640729904174805
-        Y: 1.5139228105545044
-        Z: 1.6784265041351318
+        X: -2.6423866748809814
+        Y: 0.7958899140357971
+        Z: 2.076629877090454
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false

@@ -4,7 +4,7 @@ import math
 import numpy as np
 import rospy
 import tf
-import gc
+# import gc 
 from nav_msgs.msg import OccupancyGrid,Odometry
 from sensor_msgs.msg import LaserScan
 from threading import Lock
@@ -38,11 +38,13 @@ class Mapping():
         self.weight=0.02
 
         self.lock=Lock()
+        self.odometryInterval=5
+        self.odometryCount=0
         # ros topic
         self.map_pub = rospy.Publisher('/slam_map',OccupancyGrid,queue_size=1)
         # only admits newest laser message.
         self.laser_sub=rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback,queue_size=1)
-        self.odometry_sub=rospy.Subscriber(self.frameName,Odometry,self.odometryCallback,queue_size=1)
+        self.odometry_sub=rospy.Subscriber(self.frameName,Odometry,self.odometryCallback,queue_size=self.odometryInterval)
         self.laser=None
 
     def laserCallback(self,msg):
@@ -56,6 +58,11 @@ class Mapping():
 
     def odometryCallback(self,msg):
         # print("received new odometry!!!\n")
+        self.odometryCount+=1
+        if self.odometryCount<self.odometryInterval:
+            return
+        self.odometryCount=0
+
         self.lock.acquire()
         pc=self.laserToNumpy(self.laser)
         self.lock.release()
@@ -64,7 +71,7 @@ class Mapping():
         pc=np.dot(tf.transformations.euler_matrix(0,0,yaw)[0:2,0:2],pc)+translation.reshape(2,1)
         self.update(pc,translation)
         self.publishMap()
-        gc.collect()
+        # gc.collect() # gc can't save it...
         return
 
     def publishMap(self):
