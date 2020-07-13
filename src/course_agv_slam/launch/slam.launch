@@ -1,5 +1,5 @@
 <launch>
-	<node pkg="course_agv_slam" type="slam_ekf.py" name="localization" output="screen" >
+	<node pkg="course_agv_slam" type="slam_ekf.py" name="slam" output="screen" >
 	
 		<param name="range_threshold" value="0.5"/>
 		<param name="radius_max_th" value="0.4"/>

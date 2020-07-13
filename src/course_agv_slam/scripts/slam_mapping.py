@@ -26,16 +26,7 @@ class SLAM_Mapping(SLAM_Localization):
         self.robot_x = float(rospy.get_param('/slam/robot_x',0))
         self.robot_y = float(rospy.get_param('/slam/robot_y',0))
         self.robot_theta = float(rospy.get_param('/slam/robot_theta',0))
-        ## mapping parameters
-        self.map_x_width = float(rospy.get_param('/slam/map_width',25))
-        self.map_y_width = float(rospy.get_param('/slam/map_height',25))
-        self.map_reso = float(rospy.get_param('/slam/map_resolution',0.1))
-        self.map_cellx_width = int(round(self.map_x_width/self.map_reso))
-        self.map_celly_width = int(round(self.map_y_width/self.map_reso))
-
-        self.mapping = Mapping(self.map_cellx_width,self.map_celly_width,self.map_reso)
-        self.map_pub = rospy.Publisher('/slam_map',OccupancyGrid,queue_size=1)
-
+        self.mapping = Mapping()
 
     # feed icp landmark instead of laser.
     def laserCallback(self,msg):
@@ -75,34 +66,11 @@ class SLAM_Mapping(SLAM_Localization):
         # # FIXME
         # pointCloud = self.u2T(self.xEst[0:3]).dot(np_msg)
         pointCloud=np.dot(tf.transformations.euler_matrix(0,0,self.xEst[2,0])[0:2,0:2],self.icp.laserToNumpy(msg))+self.xEst[0:2]
-        pmap = self.mapping.update(pointCloud, self.xEst[0:2].reshape(-1))
-        self.publishMap(pmap)
-        return
-
-    
-    def publishMap(self,pmap):
-        map_msg = OccupancyGrid()
-        map_msg.header.seq = 1
-        map_msg.header.stamp = rospy.Time().now()
-        map_msg.header.frame_id = "map"
-
-        map_msg.info.map_load_time = rospy.Time().now()
-        map_msg.info.resolution = self.map_reso
-        map_msg.info.width = self.map_cellx_width
-        map_msg.info.height = self.map_celly_width
-        map_msg.info.origin.position.x = -self.map_cellx_width*self.map_reso/2.0
-        map_msg.info.origin.position.y = -self.map_celly_width*self.map_reso/2.0
-        map_msg.info.origin.position.z = 0
-        map_msg.info.origin.orientation.x = 0
-        map_msg.info.origin.orientation.y = 0
-        map_msg.info.origin.orientation.z = 0
-        map_msg.info.origin.orientation.w = 1.0
-
-        map_msg.data = list(pmap.T.reshape(-1)*100)
         
-        self.map_pub.publish(map_msg)
-
-
+        self.mapping.update(pointCloud, self.xEst[0:2].reshape(-1))
+        self.mapping.publishMap()
+        return
+    
 def main():
     rospy.init_node('slam_node')
     s = SLAM_Mapping()

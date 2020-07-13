@@ -26,6 +26,7 @@ class Localization(object):
     '''
     The basic Localizing function class. Father of all sorts of Odometry class like ICP.
     Includes several utility functions.
+    nodeName is also frame name.
     '''
     def __init__(self,nodeName):
         self.nodeName=nodeName
@@ -43,7 +44,7 @@ class Localization(object):
 
         # tf broadcast
         q = tf.transformations.quaternion_from_euler(0,0,s[2])
-        self.odom_broadcaster.sendTransform((s[0],s[1],0.001),(q[0],q[1],q[2],q[3]),
+        self.odom_broadcaster.sendTransform((s[0],s[1],0.001),tuple(q),
                             rospy.Time.now(),self.nodeName,"world_base")
 
     def translateResult(self,T):
@@ -84,7 +85,9 @@ class Localization(object):
         # odom.pose.pose.orientation.y = q[1]
         # odom.pose.pose.orientation.z = q[2]
         # odom.pose.pose.orientation.w = q[3]
-        odom.pose.pose.orientation=Quaternion(q[0],q[1],q[2],q[3])
+        
+        # very elegant grammar!
+        odom.pose.pose.orientation=Quaternion(*q)
 
         return odom
 
