@@ -200,12 +200,12 @@ Visualization Manager:
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: false
+      Enabled: true
       Name: Map
       Topic: /map
       Unreliable: false
       Use Timestamp: false
-      Value: false
+      Value: true
     - Angle Tolerance: 0.10000000149011612
       Class: rviz/Odometry
       Covariance:
@@ -224,7 +224,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 300
+      Keep: 100
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Shape:
@@ -258,7 +258,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 300
+      Keep: 100
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Shape:
@@ -292,7 +292,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 300
+      Keep: 100
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Shape:
@@ -388,16 +388,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 42.9947509765625
+      Distance: 19.966938018798828
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.188178539276123
-        Y: 2.459088087081909
-        Z: 1.2166428565979004
+        X: 0.21640729904174805
+        Y: 1.5139228105545044
+        Z: 1.6784265041351318
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false

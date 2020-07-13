@@ -6,7 +6,7 @@ from sensor_msgs.msg import LaserScan,JointState
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TransformStamped,Pose,PoseStamped,Point,Quaternion
 from std_msgs.msg import Header
-from threading import Lock,Thread
+from threading import Lock
 import numpy as np
 import math
 import time
@@ -90,12 +90,14 @@ class WheelOdometry(object):
         return self.odometry.pose.pose
 
     def loop(self):
-        while self.working:
-            success=self.positioning()
-            if success:
-                self.publishOdometry()
-            time.sleep(self.deltaT)
-            
+        while self.working and not rospy.is_shutdown():
+            try:
+                success=self.positioning()
+                if success:
+                    self.publishOdometry()
+                time.sleep(self.deltaT)
+            except rospy.ROSInterruptException:
+                break
         print("exit looping...")
         return
             
@@ -105,4 +107,7 @@ def main():
     rospy.spin()
 
 if __name__ == "__main__":
-    main() 
+    try:
+        main()
+    except rospy.ROSInterruptException:
+        pass
