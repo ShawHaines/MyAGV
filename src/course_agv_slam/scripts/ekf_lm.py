@@ -4,7 +4,7 @@ import tf
 from ekf import EKF,STATE_SIZE,LM_SIZE,INF
 
 M_DIST_TH = 0.6  # Threshold of Mahalanobis distance for data association.
-# EKF state covariance
+# covariance of Odometry relative displacement u 
 Cx = np.diag([0.35, 0.35, np.deg2rad(15.0)]) ** 2
 
 class EKF_Landmark(EKF):
@@ -78,19 +78,18 @@ class EKF_SLAM(EKF_Landmark):
         """
         Jacobian of Odom Model
         y = [x,y,w,...,xi,yi,...]T
-        u = [ox,oy,ow]T
+        u = [dx,dy,dw]T
         returns (G,Fx)
         x_t=G*x_{t-1}+Fx*u
         """
-        yLength=2*np.size(lEst,1)+STATE_SIZE
+        lSize=np.size(lEst,1)
+        yLength=LM_SIZE*lSize+STATE_SIZE
         # the Jacobian for x
         G=np.identity(yLength)
         # the Jacobian for u
-        Fx=np.zeros_like(G)
-        expandedCx=np.zeros_like(G)
+        Fx=np.zeros((yLength,STATE_SIZE))
         Fx[0:STATE_SIZE,0:STATE_SIZE]=np.identity(STATE_SIZE)
-        expandedCx[0:STATE_SIZE,0:STATE_SIZE]=Cx
-        return (G,Fx,expandedCx)
+        return (G,Fx)
 
     def jacob_h(self, landmark, neighbour, x):
         '''
@@ -114,5 +113,5 @@ class EKF_SLAM(EKF_Landmark):
         Hl[neighbour.src_indices,neighbour.tar_indices]=1
         # Excellent usage on kronecker multiplying!
         Hl=np.kron(Hl,rotation.T)
-
+        # print("Hl=\n{}".format(Hl))
         return np.hstack((H,Hl))

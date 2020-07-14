@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 
 STATE_SIZE = 3  # State size [x,y,yaw]
 LM_SIZE = 2  # LM state size [x,y]
-INF = 50
+INF = 1e4
 
 # Covariance for EKF simulation
 Q = np.diag([

@@ -73,10 +73,10 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
         self.laser_interval=5
 
         # State Vector [x y yaw].T, column vector.
-        # self.xOdom = np.zeros((STATE_SIZE,1))
         self.xEst = np.zeros((STATE_SIZE,1))
-        # Covariance.
-        self.PEst = np.eye(STATE_SIZE)
+        # Covariance. Initial state is certain.
+        # self.PEst=np.eye(STATE_SIZE)
+        self.PEst=np.zeros((STATE_SIZE,STATE_SIZE))
         
         # init map
         # map observation
@@ -188,7 +188,8 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
 
     def estimate(self,xEst,PEst,z,u):
         G,Fx=self.jacob_motion(xEst,u)
-        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(Cx,Fx))
+        # FIXME: the G and Fx transpose is confused. Thanks god they are all symmetric matrices...
+        covariance=np.dot(G,np.dot(PEst,G.T))+np.dot(Fx,np.dot(Cx,Fx.T))
         
         # Predict
         xPredict=self.odom_model(xEst,u)
