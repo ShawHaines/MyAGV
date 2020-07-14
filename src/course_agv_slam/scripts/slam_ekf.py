@@ -133,17 +133,15 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         missed=len(missedIndices)
 
         neighbour.src_indices+=missedIndices
-        # the newly-added landmarks
         neighbour.tar_indices+=range(lSize,missed+lSize)
 
         zObserved=z[:,neighbour.src_indices]
         # add new landmarks to newL (new lEst)
-        # newL=np.hstack((lEst,np.repeat(xPredict[0:2],missed,axis=1)))
-        # delicately select the spawning position...
-        newL=np.dot(tf.transformations.euler_matrix(0,0,xPredict[2,0])[0:2,0:2],z[:,missedIndices])+xPredict[0:2]
-        newL=np.hstack((lEst,newL))
-        zEst=self.observation_model(xPredict,newL) 
-        zPredict=zEst[:,neighbour.tar_indices]
+        # Will this work? Arbitraryly set new landmark position and just assign the z values
+        # (though they don't fit the observation model...)
+        newL=np.hstack((lEst,np.repeat(spawnPosition,missed,axis=1)))
+        zPredict=np.hstack((zPredict,z[:,missedIndices]))
+
         # the newly-added landmarks' uncertainty is very large
         # newSize=STATE_SIZE+LM_SIZE*np.size(newL,1)
         # newP=np.zeros((newSize,newSize))
