@@ -37,12 +37,6 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         # landMark Estimation. Like former self.tar_pc
         self.lEst = np.zeros((LM_SIZE,0)) # lEst should be of 2*N size
 
-        # FIXME: What are those?
-        # map observation
-        self.obstacle = []
-        # radius
-        self.obstacle_r = 0.35
-
         # ros topic
         self.laser_sub = rospy.Subscriber('/course_agv/laser/scan',LaserScan,self.laserCallback)
         # self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
@@ -54,6 +48,8 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         self.extraction.landMark_min_pt = int(rospy.get_param('/slam/landMark_min_pt',1))
         # maximum radius to be identified as landmark
         self.extraction.radius_max_th = float(rospy.get_param('/slam/radius_max_th',0.4))
+
+        self.obstacle_r=0.35
 
     # feed icp landmark instead of laser.
     def laserCallback(self,msg):
@@ -125,8 +121,6 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
 
         lSize=np.size(lEst,1)
         zSize=np.size(z,1)
-        # where the new landmarks are generated. This is somewhat arbitary.
-        spawnPosition=np.array([[0,0]]).T
         # how many observed landmarks are missed, how many new ones will be added.
         missedIndices=sorted(list(set(range(zSize))-set(neighbour.src_indices)))
         paired=len(neighbour.src_indices)
@@ -138,25 +132,20 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
 
         zObserved=z[:,neighbour.src_indices]
         # add new landmarks to newL (new lEst)
-        # newL=np.hstack((lEst,np.repeat(xPredict[0:2],missed,axis=1)))
         # delicately select the spawning position...
         newL=np.dot(tf.transformations.euler_matrix(0,0,xPredict[2,0])[0:2,0:2],z[:,missedIndices])+xPredict[0:2]
         newL=np.hstack((lEst,newL))
         zEst=self.observation_model(xPredict,newL) 
         zPredict=zEst[:,neighbour.tar_indices]
         # the newly-added landmarks' uncertainty is very large
-        # newSize=STATE_SIZE+LM_SIZE*np.size(newL,1)
-        # newP=np.zeros((newSize,newSize))
-        # newP[0:np.size(PEst,0),0:np.size(PEst,1)]=PEst
-        # newP[np.size(PEst,0):-1,np.size(PEst,1):-1]=np.diag([INF]*LM_SIZE*missed)
         # block is so powerful!
         covariance=scilinalg.block_diag(covariance,np.diag([INF]*LM_SIZE*missed))
         yPredict=self.XLtoY(xPredict,newL)
 
-        variance=self.alpha/(paired+self.alpha)*self.obstacle_r
+        variance=self.alpha/(zSize+self.alpha)*self.obstacle_r
         print("\n\npaired: {} variance: {} missed: {} landmarks: {}".format(paired,variance,missed,lSize+missed))
         if zSize<self.min_match:
-            print("Matching points are too little to execute update.")
+            print("Observed landmarks are too little to execute update.")
             #  only update according to the prediction stage.
             return xPredict,newL,covariance
 
@@ -165,15 +154,15 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         # z (2*n)array->(2n*1) array
         zPredict =np.vstack(np.hsplit(zPredict,np.size(zPredict,1)))
         zObserved=np.vstack(np.hsplit(zObserved,np.size(zObserved,1)))
-        print("delta z: \n{}\n".format(zObserved-zPredict))
+        # print("delta z: \n{}\n".format(zObserved-zPredict))
         
-        print("covariance:\n{}\n".format(covariance))
+        # print("covariance:\n{}\n".format(covariance))
         # Karman factor. Universal formula.
-        K=np.dot(np.dot(covariance,m.T),np.linalg.inv(np.dot(m,np.dot(covariance,m.T))+np.diag([self.obstacle_r**2]*2*zSize)))
+        K=np.dot(np.dot(covariance,m.T),np.linalg.inv(np.dot(m,np.dot(covariance,m.T))+np.diag([variance**2]*2*zSize)))
 
         # Update
         fix=np.dot(K,zObserved-zPredict)
-        print("fix: \n{}\n\n".format(fix))
+        # print("fix: \n{}\n\n".format(fix))
         yEst=yPredict+fix
         PEst=covariance-np.dot(K,np.dot(m,covariance))
         xEst,lEst=self.YtoXL(yEst)
