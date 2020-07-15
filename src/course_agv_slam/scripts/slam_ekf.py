@@ -84,13 +84,8 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         '''
         Let icp handle the odometry, returns a relative odometry u.
         '''
-        state0=np.copy(self.icp.xEst)
         # laser callback is manually fed by its owner class.
-        # self.icp.laserCallback(self.extraction.process(msg))
-        self.icp.laserCallback(msg)
-        # relative state.
-        u=self.icp.xEst-state0
-        return u
+        return self.icp.laserCallback(msg)
 
     # EKF virtual function.
     def observation_model(self,xEst,lEst):

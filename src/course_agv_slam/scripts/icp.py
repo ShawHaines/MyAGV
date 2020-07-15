@@ -346,7 +346,7 @@ class SubICP(ICPBase):
         self.publishResult()
         duration=rospy.Time.now()-time_0
         print("time_cost: {} s".format(duration.to_sec()))
-        pass
+        return self.T2u(T)
 
 class LandmarkICP(ICPBase):
     def __init__(self):
@@ -366,7 +366,7 @@ class LandmarkICP(ICPBase):
         self.publishResult()
         duration=rospy.Time.now()-time_0
         print("time_cost: {} s".format(duration.to_sec()))
-        pass
+        return self.T2u(T)
 
 def main():
     rospy.init_node('icp_node')

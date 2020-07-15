@@ -3,6 +3,8 @@
 	<param name="slam/radius_max_th" value="0.1"/>
 	<param name="slam/landMark_min_pt" value="2"/>
 	<param name="slam/min_match" value="1"/>
+
+	<param name="/icp/dis_th" value="1.0"/>
 	<node pkg="course_agv_slam" type="slam_ekf.py" name="slam" output="screen" />
 	<node pkg="course_agv_slam" type="wheel.py" name="wheel_odometry" output="screen"/>
 

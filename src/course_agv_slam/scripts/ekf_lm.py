@@ -86,9 +86,11 @@ class EKF_SLAM(EKF_Landmark):
         yLength=LM_SIZE*lSize+STATE_SIZE
         # the Jacobian for x
         G=np.identity(yLength)
+        derivativeR=tf.transformations.euler_matrix(0,0,xEst[2,0]+np.pi/2)[0:3,0:3]
+        G[0:3,2]=np.dot(derivativeR,u).reshape(-1)
         # the Jacobian for u
         Fx=np.zeros((yLength,STATE_SIZE))
-        Fx[0:STATE_SIZE,0:STATE_SIZE]=np.identity(STATE_SIZE)
+        Fx[0:STATE_SIZE,0:STATE_SIZE]=tf.transformations.euler_matrix(0,0,xEst[2,0])[0:3,0:3]
         return (G,Fx)
 
     def jacob_h(self, landmark, neighbour, x):
