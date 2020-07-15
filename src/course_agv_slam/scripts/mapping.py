@@ -104,9 +104,6 @@ class MappingBase(object):
         for point in laserPC.T:
             end=list(np.round(point//self.resolution).astype(int))
             pointList=self.line(start,end)
-            # FIXME: turns out this line of code is necessary for not leaking...
-            # the failure at the same location might be because
-            #  at that location a ray is projected on the same grid as the robot...
             if np.size(pointList)==0:
                 return
             # remove obstacle point.
@@ -167,7 +164,10 @@ class MappingBase(object):
     def laserToNumpy(self,msg):
         total_num = len(msg.ranges)
         range_l = np.array(msg.ranges)
-        angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)
+        # FIXME: there COULD be inf! Need to discard them!
+        valid=~np.isinf(range_l)
+        range_l=range_l[valid]
+        angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)[valid]
         pc = np.vstack((np.multiply(np.cos(angle_l),range_l),np.multiply(np.sin(angle_l),range_l)))
         return pc
 

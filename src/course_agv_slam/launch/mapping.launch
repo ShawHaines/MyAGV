@@ -3,16 +3,16 @@
     <!-- Run the map server -->
     <!-- <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" /> -->
 
+    <param name="mapping/map_width" value="25.0"/>
+    <param name="mapping/map_height" value="25.0"/>
+    <param name="mapping/map_resolution" value="0.1"/>
+    <param name="mapping/range_threshold" value="0.5"/>
+    <param name="mapping/odometry_interval" value="1"/>
+    <!-- change it according to the frame you are using -->
+    <param name="mapping/frame_name" value="ekf_icp"/>
 
-	<node pkg="course_agv_slam" type="mapping.py" name="mapping" output="screen" launch-prefix="xterm -e">
-        <param name="map_width" value="25.0"/>
-        <param name="map_height" value="25.0"/>
-        <param name="map_resolution" value="0.1"/>
-        <param name="range_threshold" value="0.5"/>
-        <param name="odometry_interval" value="1"/>
-        <!-- change it according to the frame you are using -->
-        <param name="frame_name" value="ekf_icp"/>
-	</node>
+	<node pkg="course_agv_slam" type="mapping_add.py" name="mapping" output="screen"/>
+
     <!-- change it according to the localizing system you want to use. -->
     <include file="$(find course_agv_slam)/launch/localization_lm.launch"/> 
 

@@ -281,13 +281,15 @@ class ICPBase(Localization):
        
     def laserToNumpy(self,msg):
         # the x,y coordinates are in robot's frame?
-        total_num = len(msg.ranges)
         # pc = np.ones([3,total_num])
+        total_num = len(msg.ranges)
         range_l = np.array(msg.ranges)
-        angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)
+        # there COULD be inf! Need to discard them!
+        valid=~np.isinf(range_l)
+        range_l=range_l[valid]
+        angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)[valid]
         # ufunc, high performance
         pc = np.vstack((np.multiply(np.cos(angle_l),range_l),np.multiply(np.sin(angle_l),range_l)))
-        # print("Numpy pc:{}".format(pc))
         return pc
 
 class ICP(ICPBase):
