@@ -82,7 +82,7 @@ Or you can launch gazebo and see the result.
 ```bash
 roslaunch course_agv_slam localization.launch
 # In another terminal
-rosbag play --clock --rate=4 xxx.bag
+rosbag play --clock [--rate=4] xxx.bag
 ```
 
 ![EKFSample](./img/EKFSample.png)
@@ -96,7 +96,35 @@ A series of light green arrows are added, representing the EKF localizing result
 ```bash
 roslaunch course_agv_slam localization_lm.launch
 # In another terminal
-rosbag play --clock --rate=4 xxx.bag
+rosbag play --clock [--rate=4] xxx.bag
 ```
 
 Note that the script can't identify the landmarks properly when using 120 rays of laser.
+
+### Mapping
+### 栅格地图构建
+
+```bash
+roslaunch course_agv_slam mapping.launch
+# In another terminal
+rosbag play --clock [--rate=4] xxx.bag
+```
+
+By default the `mapping.launch` use `mapping_add.py` for mapping and `slam.launch` for localization.
+
+Or you can change the mapping nodes according to your need:
+
+| Script           | Description                                            |
+| ---------------- | ------------------------------------------------------ |
+| mapping.py       | Simplest 1/0 mapping. 最简单的透射为0，反射为1         |
+| mapping_add.py   | 加法方法，透射概率减小一个定值，反射概率增大一个定值   |
+| bayes_mapping.py | Use Bayes odds updating formula 贝叶斯对数概率更新公式 |
+
+In addition, you can adjust your localizing node by changing the included launch file, **DON'T FORGET** to change parameter `mapping/frame_name` for mapping!
+
+| launch file            | Description                             | `mapping/frame_name` |
+| ---------------------- | --------------------------------------- | -------------------- |
+| slam.launch            | EKF-SLAM 扩展卡曼滤波同时定位与地图构建 | slam_ekf             |
+| localization_lm.launch | EKF-Landmark 扩展卡曼滤波特征定位       | ekf_icp              |
+| localiztion.launch     | EKF 基于激光里程计的扩展卡曼滤波定位    | ekf_icp              |
+
