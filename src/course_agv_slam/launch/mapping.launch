@@ -4,7 +4,7 @@
     <!-- <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" /> -->
 
 
-	<node pkg="course_agv_slam" type="bayes_mapping.py" name="mapping" output="screen">
+	<node pkg="course_agv_slam" type="mapping.py" name="mapping" output="screen" launch-prefix="xterm -e">
         <param name="map_width" value="25.0"/>
         <param name="map_height" value="25.0"/>
         <param name="map_resolution" value="0.1"/>

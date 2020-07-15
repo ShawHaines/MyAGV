@@ -10,7 +10,7 @@ from nav_msgs.msg import OccupancyGrid
 import numpy as np
 from icp import LandmarkICP,SubICP,NeighBor
 from localization_lm import LandmarkLocalization
-from ekf_lm import EKF_SLAM,STATE_SIZE,LM_SIZE,Cx,INF
+from ekf_lm import EKF_SLAM,STATE_SIZE,LM_SIZE,Cx,INF,OBSTACLE_RADIUS
 from extraction import Extraction
 import scipy.linalg as scilinalg
 # import sys
@@ -49,7 +49,7 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         # maximum radius to be identified as landmark
         self.extraction.radius_max_th = float(rospy.get_param('/slam/radius_max_th',0.4))
 
-        self.obstacle_r=0.35
+        OBSTACLE_RADIUS=0.35
 
     # feed icp landmark instead of laser.
     def laserCallback(self,msg):
@@ -127,6 +127,7 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
 
         zObserved=z[:,neighbour.src_indices]
         # add new landmarks to newL (new lEst)
+        # newL=np.repeat(xPredict[0:2],missed,axis=1)
         # delicately select the spawning position...
         newL=np.dot(tf.transformations.euler_matrix(0,0,xPredict[2,0])[0:2,0:2],z[:,missedIndices])+xPredict[0:2]
         newL=np.hstack((lEst,newL))
@@ -137,7 +138,7 @@ class SLAM_Localization(LandmarkLocalization,EKF_SLAM):
         covariance=scilinalg.block_diag(covariance,np.diag([INF]*LM_SIZE*missed))
         yPredict=self.XLtoY(xPredict,newL)
 
-        variance=self.alpha/(zSize+self.alpha)*self.obstacle_r
+        variance=self.alpha/(zSize+self.alpha)*OBSTACLE_RADIUS
         print("\n\npaired: {} variance: {} missed: {} landmarks: {}".format(paired,variance,missed,lSize+missed))
         if zSize<self.min_match:
             print("Observed landmarks are too little to execute update.")

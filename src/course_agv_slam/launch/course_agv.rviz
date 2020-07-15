@@ -10,6 +10,7 @@ Panels:
         - /Odometry3/Shape1
         - /MarkerArray1
         - /MarkerArray1/Namespaces1
+        - /Map2/Status1
         - /Odometry4/Shape1
       Splitter Ratio: 0.5
     Tree Height: 549
@@ -86,6 +87,8 @@ Visualization Manager:
           Value: true
         course_agv__right_wheel:
           Value: true
+        ekf_icp:
+          Value: true
         icp_odom:
           Value: true
         map:
@@ -93,8 +96,6 @@ Visualization Manager:
         robot_base:
           Value: true
         robot_chassis:
-          Value: true
-        slam_ekf:
           Value: true
         world_base:
           Value: true
@@ -105,6 +106,8 @@ Visualization Manager:
       Show Names: false
       Tree:
         world_base:
+          ekf_icp:
+            {}
           icp_odom:
             {}
           map:
@@ -119,8 +122,6 @@ Visualization Manager:
                 {}
               robot_chassis:
                 {}
-          slam_ekf:
-            {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -192,7 +193,7 @@ Visualization Manager:
       Topic: /course_agv/imu
       Unreliable: false
       Value: true
-    - Alpha: 0.699999988079071
+    - Alpha: 0.30000001192092896
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
@@ -314,7 +315,7 @@ Visualization Manager:
         paired: true
       Queue Size: 300
       Value: true
-    - Alpha: 0.5
+    - Alpha: 0.699999988079071
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
@@ -393,9 +394,9 @@ Visualization Manager:
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -2.0378832817077637
-        Y: -2.4665822982788086
-        Z: 3.4125192165374756
+        X: 0.3540882468223572
+        Y: 1.5225214958190918
+        Z: 1.670055627822876
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false

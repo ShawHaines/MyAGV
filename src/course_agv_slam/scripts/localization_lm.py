@@ -11,7 +11,7 @@ from nav_msgs.msg import Odometry
 from visualization_msgs.msg import MarkerArray,Marker
 import numpy as np
 from icp import LandmarkICP,Localization,SubICP
-from ekf_lm import EKF_Landmark,STATE_SIZE,LM_SIZE,Cx
+from ekf_lm import EKF_Landmark,STATE_SIZE,LM_SIZE,Cx,OBSTACLE_RADIUS
 from extraction import Extraction
 # from localization import ICPLocalization
 
@@ -206,7 +206,7 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
         zPrime=z[:,neighbour.src_indices]
 
         length=len(neighbour.src_indices)
-        variance=self.alpha/(length+self.alpha)
+        variance=self.alpha/(length+self.alpha)*OBSTACLE_RADIUS
         print("\n\nlength: {} variance: {}".format(length,variance))
         # turns out no matter how little the information is, it is of value somewhat. min_match can be set to 1.
         if length<self.min_match:

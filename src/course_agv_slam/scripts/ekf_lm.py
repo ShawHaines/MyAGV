@@ -5,7 +5,8 @@ from ekf import EKF,STATE_SIZE,LM_SIZE,INF
 
 M_DIST_TH = 0.6  # Threshold of Mahalanobis distance for data association.
 # covariance of Odometry relative displacement u 
-Cx = np.diag([0.35, 0.35, np.deg2rad(15.0)]) ** 2
+Cx = np.diag([0.15, 0.15, np.deg2rad(5)]) ** 2
+OBSTACLE_RADIUS=0.35
 
 class EKF_Landmark(EKF):
     def __init__(self):
