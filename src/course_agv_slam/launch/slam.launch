@@ -1,11 +1,9 @@
 <launch>
-	<node pkg="course_agv_slam" type="slam_ekf.py" name="slam" output="screen" >
-	
-		<param name="range_threshold" value="0.5"/>
-		<param name="radius_max_th" value="0.1"/>
-		<param name="landMark_min_pt" value="2"/>
-		<param name="min_match" value="1"/>
-	</node>
+	<param name="slam/range_threshold" value="0.5"/>
+	<param name="slam/radius_max_th" value="0.1"/>
+	<param name="slam/landMark_min_pt" value="2"/>
+	<param name="slam/min_match" value="1"/>
+	<node pkg="course_agv_slam" type="slam_ekf.py" name="slam" output="screen" />
 	<node pkg="course_agv_slam" type="wheel.py" name="wheel_odometry" output="screen"/>
 
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find course_agv_slam)/launch/course_agv.rviz" />

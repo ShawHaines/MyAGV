@@ -23,6 +23,8 @@ class LandmarkLocalization(Localization):
     def __init__(self,nodeName):
         super(LandmarkLocalization,self).__init__(nodeName)
         self.landMark_pub = rospy.Publisher('/landmarks',MarkerArray,queue_size=3)
+        # auxilary... just to make the markers look normal...
+        self.MAX_MARKER=0
 
     def publishLandMark(self,msg,color="b",namespace="laser",frame="course_agv__hokuyo__link"):
         '''
@@ -30,9 +32,12 @@ class LandmarkLocalization(Localization):
         '''
         # if len(msg) <= 0:
         #     return
-        
+        lSize=np.size(msg,1)
+        if lSize>self.MAX_MARKER:
+            self.MAX_MARKER=lSize
         landMark_array = MarkerArray()
         landMark_array.markers=[self.toMarker(x,i,color,namespace,frame) for i,x in enumerate(msg.T)]
+        landMark_array.markers+=[self.toMarker((0,0),i,"t",namespace,frame) for i in range(lSize,self.MAX_MARKER)]
         self.landMark_pub.publish(landMark_array)
 
     def toMarker(self,pair,id=0,color="b",namespace="laser",frame="course_agv__hokuyo__link"):
@@ -44,6 +49,7 @@ class LandmarkLocalization(Localization):
             "r":[1,0,0,1.0], "R":[1,0,0,1.0],
             "g":[0,1,0,1.0], "G":[0,1,0,1.0],
             "b":[0,0,1,1.0], "B":[0,0,1,1.0],
+            "t":[0,0,0,0.0], "T":[0,0,0,0.0], # transparent
         }
         marker = Marker(header=Header(id,rospy.Time(0),frame))
         marker.ns = namespace
@@ -52,7 +58,11 @@ class LandmarkLocalization(Localization):
         marker.action = Marker.ADD
         marker.pose.position=Point(pair[0],pair[1],0)
         marker.pose.orientation=Quaternion(0,0,0,1)
-        marker.scale=Vector3(0.2,0.2,0.2)
+        if color=="t" or color=="T":
+            # marker.action=Marker.DELETEALL
+            marker.scale=Vector3(0,0,0)
+        else:
+            marker.scale=Vector3(0.2,0.2,0.2)
         # * is a very useful grammar when passing arguments! 
         # expands the list or tuple in order. 
         marker.color=ColorRGBA(*colorDict[color])

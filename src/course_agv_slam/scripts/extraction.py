@@ -56,4 +56,20 @@ class Extraction():
                 landmark[:,index]=np.mean(pc[:,np.arange(i+1,j+1)],axis=1)
             else:
                 landmark[:,index]=np.mean(pc[:,np.hstack((np.arange(i+1,total_num),np.arange(j+1)))],axis=1)
-        return landmark
+        return self.filter(landmark)
+
+    def filter(self,landmark):
+        '''
+        filter out the landmarks that are so close to each other.
+        '''
+        newLandmark=np.copy(landmark)
+        i=0
+        while i<np.size(newLandmark,1):
+            j=i+1
+            while j<np.size(newLandmark,1):
+                if np.linalg.norm(newLandmark[:,i]-newLandmark[:,j])<self.range_threshold:
+                    np.delete(newLandmark,j,axis=1)
+                else:
+                    j+=1
+            i+=1
+        return newLandmark
