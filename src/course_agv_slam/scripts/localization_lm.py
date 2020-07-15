@@ -11,7 +11,7 @@ from nav_msgs.msg import Odometry
 from visualization_msgs.msg import MarkerArray,Marker
 import numpy as np
 from icp import LandmarkICP,Localization,SubICP
-from ekf_lm import EKF_Landmark,STATE_SIZE,LM_SIZE,Cx
+from ekf_lm import EKF_Landmark,STATE_SIZE,LM_SIZE,Cx,OBSTACLE_RADIUS
 from extraction import Extraction
 # from localization import ICPLocalization
 
@@ -23,6 +23,8 @@ class LandmarkLocalization(Localization):
     def __init__(self,nodeName):
         super(LandmarkLocalization,self).__init__(nodeName)
         self.landMark_pub = rospy.Publisher('/landmarks',MarkerArray,queue_size=3)
+        # auxilary... just to make the markers look normal...
+        self.MAX_MARKER=0
 
     def publishLandMark(self,msg,color="b",namespace="laser",frame="course_agv__hokuyo__link"):
         '''
@@ -30,9 +32,12 @@ class LandmarkLocalization(Localization):
         '''
         # if len(msg) <= 0:
         #     return
-        
+        lSize=np.size(msg,1)
+        if lSize>self.MAX_MARKER:
+            self.MAX_MARKER=lSize
         landMark_array = MarkerArray()
         landMark_array.markers=[self.toMarker(x,i,color,namespace,frame) for i,x in enumerate(msg.T)]
+        landMark_array.markers+=[self.toMarker((0,0),i,"t",namespace,frame) for i in range(lSize,self.MAX_MARKER)]
         self.landMark_pub.publish(landMark_array)
 
     def toMarker(self,pair,id=0,color="b",namespace="laser",frame="course_agv__hokuyo__link"):
@@ -44,6 +49,7 @@ class LandmarkLocalization(Localization):
             "r":[1,0,0,1.0], "R":[1,0,0,1.0],
             "g":[0,1,0,1.0], "G":[0,1,0,1.0],
             "b":[0,0,1,1.0], "B":[0,0,1,1.0],
+            "t":[0,0,0,0.0], "T":[0,0,0,0.0], # transparent
         }
         marker = Marker(header=Header(id,rospy.Time(0),frame))
         marker.ns = namespace
@@ -52,7 +58,11 @@ class LandmarkLocalization(Localization):
         marker.action = Marker.ADD
         marker.pose.position=Point(pair[0],pair[1],0)
         marker.pose.orientation=Quaternion(0,0,0,1)
-        marker.scale=Vector3(0.2,0.2,0.2)
+        if color=="t" or color=="T":
+            # marker.action=Marker.DELETEALL
+            marker.scale=Vector3(0,0,0)
+        else:
+            marker.scale=Vector3(0.2,0.2,0.2)
         # * is a very useful grammar when passing arguments! 
         # expands the list or tuple in order. 
         marker.color=ColorRGBA(*colorDict[color])
@@ -73,10 +83,10 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
         self.laser_interval=5
 
         # State Vector [x y yaw].T, column vector.
-        # self.xOdom = np.zeros((STATE_SIZE,1))
         self.xEst = np.zeros((STATE_SIZE,1))
-        # Covariance.
-        self.PEst = np.eye(STATE_SIZE)
+        # Covariance. Initial state is certain.
+        # self.PEst=np.eye(STATE_SIZE)
+        self.PEst=np.zeros((STATE_SIZE,STATE_SIZE))
         
         # init map
         # map observation
@@ -88,8 +98,8 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
         # self.location_pub = rospy.Publisher('ekf_location',Odometry,queue_size=3)
         
         # parameters from launch file.
-        # minimum landmark matches to update.
-        self.min_match = int(rospy.get_param('/localization/min_match',2))
+        # minimum landmark matches to update. Actually even 1 point is acceptable.
+        self.min_match = int(rospy.get_param('/localization/min_match',1))
         # minimum number of points for a landmark cluster
         self.extraction.landMark_min_pt = int(rospy.get_param('/localization/landMark_min_pt',2))
         # maximum radius to be identified as landmark
@@ -168,13 +178,8 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
         '''
         Let icp handle the odometry, returns a relative odometry u.
         '''
-        state0=np.copy(self.icp.xEst)
         # laser callback is manually fed by its owner class.
-        # self.icp.laserCallback(self.extraction.process(msg))
-        self.icp.laserCallback(msg)
-        # relative state.
-        u=self.icp.xEst-state0
-        return u
+        return self.icp.laserCallback(msg)
 
     # EKF virtual function.
     def observation_model(self,xEst):
@@ -188,7 +193,8 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
 
     def estimate(self,xEst,PEst,z,u):
         G,Fx=self.jacob_motion(xEst,u)
-        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(Cx,Fx))
+        # FIXME: the G and Fx transpose is confused. Thanks god they are all symmetric matrices...
+        covariance=np.dot(G,np.dot(PEst,G.T))+np.dot(Fx,np.dot(Cx,Fx.T))
         
         # Predict
         xPredict=self.odom_model(xEst,u)
@@ -200,8 +206,9 @@ class EKF_Landmark_Localization(LandmarkLocalization,EKF_Landmark):
         zPrime=z[:,neighbour.src_indices]
 
         length=len(neighbour.src_indices)
-        variance=self.alpha/(length+self.alpha)
+        variance=self.alpha/(length+self.alpha)*OBSTACLE_RADIUS
         print("\n\nlength: {} variance: {}".format(length,variance))
+        # turns out no matter how little the information is, it is of value somewhat. min_match can be set to 1.
         if length<self.min_match:
             print("Matching points are too little to execute update.")
             #  only update according to the prediction stage.

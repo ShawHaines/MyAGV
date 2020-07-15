@@ -9,8 +9,8 @@ Panels:
         - /Odometry1/Shape1
         - /Odometry3/Shape1
         - /MarkerArray1
-        - /Map2
-        - /Odometry4
+        - /MarkerArray1/Namespaces1
+        - /Map2/Status1
         - /Odometry4/Shape1
       Splitter Ratio: 0.5
     Tree Height: 549
@@ -87,6 +87,8 @@ Visualization Manager:
           Value: true
         course_agv__right_wheel:
           Value: true
+        ekf_icp:
+          Value: true
         icp_odom:
           Value: true
         map:
@@ -94,8 +96,6 @@ Visualization Manager:
         robot_base:
           Value: true
         robot_chassis:
-          Value: true
-        slam_ekf:
           Value: true
         world_base:
           Value: true
@@ -106,6 +106,8 @@ Visualization Manager:
       Show Names: false
       Tree:
         world_base:
+          ekf_icp:
+            {}
           icp_odom:
             {}
           map:
@@ -120,8 +122,6 @@ Visualization Manager:
                 {}
               robot_chassis:
                 {}
-          slam_ekf:
-            {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -193,7 +193,7 @@ Visualization Manager:
       Topic: /course_agv/imu
       Unreliable: false
       Value: true
-    - Alpha: 0.699999988079071
+    - Alpha: 0.30000001192092896
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
@@ -221,7 +221,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 100
+      Keep: 300
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Shape:
@@ -255,7 +255,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 100
+      Keep: 300
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Shape:
@@ -289,7 +289,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 100
+      Keep: 300
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Shape:
@@ -315,7 +315,7 @@ Visualization Manager:
         paired: true
       Queue Size: 300
       Value: true
-    - Alpha: 0.5
+    - Alpha: 0.699999988079071
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
@@ -343,7 +343,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 100
+      Keep: 300
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Shape:
@@ -387,16 +387,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 12.251279830932617
+      Distance: 25.046527862548828
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.6256198883056641
-        Y: 1.0945333242416382
-        Z: 1.8821830749511719
+        X: 0.3540882468223572
+        Y: 1.5225214958190918
+        Z: 1.670055627822876
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -424,5 +424,4 @@ Window Geometry:
     collapsed: false
   Width: 1200
   X: 667
-  Y: 30
-s
+  Y: 27

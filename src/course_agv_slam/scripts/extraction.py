@@ -7,7 +7,7 @@ import rospy
 class Extraction():
     def __init__(self):
         self.range_threshold = float(rospy.get_param('/extraction/range_threshold',1.0))
-        self.radius_max_th = float(rospy.get_param('/extraction/radius_max_th',0.3))
+        self.radius_max_th = float(rospy.get_param('/extraction/radius_max_th',0.4))
         self.landMark_min_pt = int(rospy.get_param('"/extraction/landMark_min_pt',2))
 
     def process(self,msg,trust = False):
@@ -17,24 +17,26 @@ class Extraction():
         labels = []
         # I don't know what trust are, just ignoring them...
         ranges=np.array(msg.ranges)
-
-        theta =np.linspace(msg.angle_min,msg.angle_max,len(msg.ranges))
+        length=np.size(ranges)
+        theta =np.linspace(msg.angle_min,msg.angle_max,length)
         pointCloud=np.vstack((np.multiply(np.cos(theta),ranges),np.multiply(np.sin(theta),ranges)))
         
         # add a index[0] at the end so that diff won't subtract the length by 1
         pointCloud=np.hstack((pointCloud,pointCloud[:,0].reshape(2,1)))
         delta=np.linalg.norm(np.diff(pointCloud),axis=0)
         # jump is between jumpPos and jumpPos+1
-        jumpPos=np.nonzero(np.abs(delta)>self.range_threshold)[0]
-        np.append(jumpPos,jumpPos[0]+np.size(delta))
-        for i in range(np.size(jumpPos)-1):
-            points=jumpPos[i+1]-jumpPos[i]
+        jumpPos,=np.nonzero(np.abs(delta)>self.range_threshold) # because return value is a tuple.
+        for i in range(np.size(jumpPos)):
+            if i<np.size(jumpPos)-1:
+                points=jumpPos[i+1]-jumpPos[i]
+            else:
+                points=jumpPos[0]+length-jumpPos[i]
             # ensure enough points.
             if points>=self.landMark_min_pt:
                 # ensure not too large radius. A rough estimation, radius*angle
-                if ranges[jumpPos[i]]*msg.angle_increment*points<=self.radius_max_th*2:
-                    # This is a landmark, use the average index
-                    labels.append(((jumpPos[i]+jumpPos[i+1]+1)//2)%np.size(delta))
+                if ranges[(jumpPos[i]+1)%length]*msg.angle_increment*points<=self.radius_max_th*2:
+                    # store a tuple into labels.
+                    labels.append((jumpPos[i],jumpPos[i+1 if i+1<np.size(jumpPos) else 0]))
         return self.extractLandMark(msg,labels,trust)
         
     #  What's the difference between the two functions?
@@ -43,11 +45,31 @@ class Extraction():
         no longer use landMarkSet class. Use pointCloud (2*n array) as return value.
         '''
         ranges=np.array(msg.ranges)
-        theta =np.linspace(msg.angle_min,msg.angle_max,len(msg.ranges))
+        total_num=len(msg.ranges)
+        angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)
+        pc = np.vstack((np.multiply(np.cos(angle_l),ranges),np.multiply(np.sin(angle_l),ranges)))
 
-        ranges=ranges[labels]
-        theta =theta[labels]
-        # id is not important...
-        # landmark.id=labels
-        landmark=np.vstack((np.multiply(np.cos(theta),ranges),np.multiply(np.sin(theta),ranges)))
-        return landmark
+        length=len(labels)
+        landmark=np.zeros((2,length))
+        for index,(i,j) in enumerate(labels):
+            if i<j:
+                landmark[:,index]=np.mean(pc[:,np.arange(i+1,j+1)],axis=1)
+            else:
+                landmark[:,index]=np.mean(pc[:,np.hstack((np.arange(i+1,total_num),np.arange(j+1)))],axis=1)
+        return self.filter(landmark)
+
+    def filter(self,landmark):
+        '''
+        filter out the landmarks that are so close to each other.
+        '''
+        newLandmark=np.copy(landmark)
+        i=0
+        while i<np.size(newLandmark,1):
+            j=i+1
+            while j<np.size(newLandmark,1):
+                if np.linalg.norm(newLandmark[:,i]-newLandmark[:,j])<self.range_threshold:
+                    np.delete(newLandmark,j,axis=1)
+                else:
+                    j+=1
+            i+=1
+        return newLandmark

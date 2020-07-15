@@ -26,6 +26,7 @@ class Localization(object):
     '''
     The basic Localizing function class. Father of all sorts of Odometry class like ICP.
     Includes several utility functions.
+    nodeName is also frame name.
     '''
     def __init__(self,nodeName):
         self.nodeName=nodeName
@@ -43,7 +44,7 @@ class Localization(object):
 
         # tf broadcast
         q = tf.transformations.quaternion_from_euler(0,0,s[2])
-        self.odom_broadcaster.sendTransform((s[0],s[1],0.001),(q[0],q[1],q[2],q[3]),
+        self.odom_broadcaster.sendTransform((s[0],s[1],0.001),tuple(q),
                             rospy.Time.now(),self.nodeName,"world_base")
 
     def translateResult(self,T):
@@ -84,7 +85,9 @@ class Localization(object):
         # odom.pose.pose.orientation.y = q[1]
         # odom.pose.pose.orientation.z = q[2]
         # odom.pose.pose.orientation.w = q[3]
-        odom.pose.pose.orientation=Quaternion(q[0],q[1],q[2],q[3])
+        
+        # very elegant grammar!
+        odom.pose.pose.orientation=Quaternion(*q)
 
         return odom
 
@@ -226,6 +229,8 @@ class ICPBase(Localization):
         '''
         guarantees that src and tar won't change.
         '''
+        if np.size(tar)==0:
+            return NeighBor()
         # find the pairing strategy between src and tar.
         neighbour = NeighBor()
         length=np.size(src,1)
@@ -276,13 +281,15 @@ class ICPBase(Localization):
        
     def laserToNumpy(self,msg):
         # the x,y coordinates are in robot's frame?
-        total_num = len(msg.ranges)
         # pc = np.ones([3,total_num])
+        total_num = len(msg.ranges)
         range_l = np.array(msg.ranges)
-        angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)
+        # there COULD be inf! Need to discard them!
+        valid=~np.isinf(range_l)
+        range_l=range_l[valid]
+        angle_l = np.linspace(msg.angle_min,msg.angle_max,total_num)[valid]
         # ufunc, high performance
         pc = np.vstack((np.multiply(np.cos(angle_l),range_l),np.multiply(np.sin(angle_l),range_l)))
-        # print("Numpy pc:{}".format(pc))
         return pc
 
 class ICP(ICPBase):
@@ -341,7 +348,7 @@ class SubICP(ICPBase):
         self.publishResult()
         duration=rospy.Time.now()-time_0
         print("time_cost: {} s".format(duration.to_sec()))
-        pass
+        return self.T2u(T)
 
 class LandmarkICP(ICPBase):
     def __init__(self):
@@ -361,7 +368,7 @@ class LandmarkICP(ICPBase):
         self.publishResult()
         duration=rospy.Time.now()-time_0
         print("time_cost: {} s".format(duration.to_sec()))
-        pass
+        return self.T2u(T)
 
 def main():
     rospy.init_node('icp_node')

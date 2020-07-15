@@ -156,14 +156,10 @@ class ICPLocalization(Localization,EKF):
 
     def calc_odometry(self,msg):
         '''
-        Let icp handle the odometry, returns a relative odometry u.
+        Let icp handle the odometry, returns a relative odometry u (in OWN frame!).
         '''
-        state0=np.copy(self.icp.xEst)
         # laser callback is manually fed by its owner class.
-        self.icp.laserCallback(msg)
-        # relative state.
-        u=self.icp.xEst-state0
-        return u
+        return self.icp.laserCallback(msg)
 
     def calc_map_observation(self,msg):
         '''
@@ -195,7 +191,8 @@ class ICPLocalization(Localization,EKF):
 
     def estimate(self, xEst, PEst, z, u):
         G,Fx=self.jacob_motion(xEst,u)
-        covariance=np.dot(G.T,np.dot(PEst,G))+np.dot(Fx.T,np.dot(Q,Fx))
+        # mistaken
+        covariance=np.dot(G,np.dot(PEst,G.T))+np.dot(Fx,np.dot(Q,Fx.T))
         
         # Predict
         xPredict=self.odom_model(xEst,u)

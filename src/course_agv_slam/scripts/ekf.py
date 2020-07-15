@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import tf
 from abc import ABCMeta, abstractmethod
 
 STATE_SIZE = 3  # State size [x,y,yaw]
@@ -41,7 +42,10 @@ class EKF(object):
             x = [x,y,w,...,xi,yi,...]T
             u = [ox,oy,ow]T
         """
-        return x+u
+        # delta u in world frame.
+        # very compact and elegant!
+        newU=np.dot(tf.transformations.euler_matrix(0,0,x[2,0])[0:3,0:3],u)
+        return x+newU
 
     def jacob_motion(self, x, u):
         """
@@ -53,9 +57,12 @@ class EKF(object):
         """
 
         # the Jacobian for x
+        # FIXME: x=x+np.dot(R,u), R is a function of theta, G is NOT identity!
         G=np.identity(STATE_SIZE)
+        derivativeR=tf.transformations.euler_matrix(0,0,x[2,0]+np.pi/2)[0:3,0:3]
+        G[0:3,2]=np.dot(derivativeR,u).reshape(-1)
         # the Jacobian for u
-        Fx=np.identity(STATE_SIZE)
+        Fx=tf.transformations.euler_matrix(0,0,x[2,0])[0:3,0:3]
         return (G,Fx)
 
     @abstractmethod # virtual.

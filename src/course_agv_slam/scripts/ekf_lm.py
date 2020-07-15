@@ -4,8 +4,9 @@ import tf
 from ekf import EKF,STATE_SIZE,LM_SIZE,INF
 
 M_DIST_TH = 0.6  # Threshold of Mahalanobis distance for data association.
-# EKF state covariance
-Cx = np.diag([0.35, 0.35, np.deg2rad(15.0)]) ** 2
+# covariance of Odometry relative displacement u 
+Cx = np.diag([0.15, 0.15, np.deg2rad(5)]) ** 2
+OBSTACLE_RADIUS=0.35
 
 class EKF_Landmark(EKF):
     def __init__(self):
@@ -23,7 +24,7 @@ class EKF_Landmark(EKF):
         # the yaw(theta) derivative of rotation. [[-sin,cos],[-cos,-sin]]
         derivativeR=tf.transformations.euler_matrix(0,0,x[2,0]+math.pi/2)[0:2,0:2]
         z=tar[:,neighbour.tar_indices]
-        partialTheta=np.dot(np.transpose(derivativeR),z-x[0:2,0].reshape(2,1))
+        partialTheta=np.dot(derivativeR.T,z-x[0:2])
         partialTheta=np.vstack(np.hsplit(partialTheta,length))
         H=np.repeat(-np.transpose(rotation),length,axis=0)
         H=np.hstack((H,partialTheta))
@@ -78,33 +79,42 @@ class EKF_SLAM(EKF_Landmark):
         """
         Jacobian of Odom Model
         y = [x,y,w,...,xi,yi,...]T
-        u = [ox,oy,ow]T
+        u = [dx,dy,dw]T
         returns (G,Fx)
         x_t=G*x_{t-1}+Fx*u
         """
-        yLength=np.size(lEst,1)+STATE_SIZE
+        lSize=np.size(lEst,1)
+        yLength=LM_SIZE*lSize+STATE_SIZE
         # the Jacobian for x
         G=np.identity(yLength)
+        derivativeR=tf.transformations.euler_matrix(0,0,xEst[2,0]+np.pi/2)[0:3,0:3]
+        G[0:3,2]=np.dot(derivativeR,u).reshape(-1)
         # the Jacobian for u
-        Fx=np.zeros_like(G)
-        Fx[0:STATE_SIZE,0:STATE_SIZE]=np.identity(STATE_SIZE)
+        Fx=np.zeros((yLength,STATE_SIZE))
+        Fx[0:STATE_SIZE,0:STATE_SIZE]=tf.transformations.euler_matrix(0,0,xEst[2,0])[0:3,0:3]
         return (G,Fx)
 
-    def jacob_h(self, tar, neighbour, x):
-        # TODO: derive the formula.
+    def jacob_h(self, landmark, neighbour, x):
         '''
         the Jacobian of observation model.
         '''
-        length=len(neighbour.tar_indices)
-        if length==0:
+        zSize=len(neighbour.src_indices)
+        lSize=np.size(landmark,1)
+        if zSize==0:
             print("Error: no matching points!")
             return 0
         rotation=tf.transformations.euler_matrix(0,0,x[2,0])[0:2,0:2]
         # the yaw(theta) derivative of rotation. [[-sin,cos],[-cos,-sin]]
         derivativeR=tf.transformations.euler_matrix(0,0,x[2,0]+math.pi/2)[0:2,0:2]
-        z=tar[:,neighbour.tar_indices]
-        partialTheta=np.dot(np.transpose(derivativeR),z-x[0:2,0].reshape(2,1))
-        partialTheta=np.vstack(np.hsplit(partialTheta,length))
-        H=np.repeat(-np.transpose(rotation),length,axis=0)
+        z=landmark[:,neighbour.tar_indices]
+        partialTheta=np.dot(derivativeR.T,z-x[0:2])
+        partialTheta=np.vstack(np.hsplit(partialTheta,zSize))
+        H=np.repeat(-np.transpose(rotation),zSize,axis=0)
         H=np.hstack((H,partialTheta))
-        return H
+        # landmark part
+        Hl=np.zeros((zSize,lSize))
+        Hl[neighbour.src_indices,neighbour.tar_indices]=1
+        # Excellent usage on kronecker multiplying!
+        Hl=np.kron(Hl,rotation.T)
+        # print("Hl=\n{}".format(Hl))
+        return np.hstack((H,Hl))
