@@ -138,3 +138,12 @@ In addition, you can adjust your localizing node by changing the included launch
 | slam.launch            | EKF-SLAM 扩展卡曼滤波同时定位与地图构建 | slam_ekf             |
 | localization_lm.launch | EKF-Landmark 扩展卡曼滤波特征定位       | ekf_icp              |
 | localiztion.launch     | EKF 基于激光里程计的扩展卡曼滤波定位    | ekf_icp              |
+
+### EKF Using Mapping Result
+### 采用EKF构建的地图进行EKF定位
+
+```bash
+roslaunch course_agv_slam localization_mapping.launch
+# In another terminal
+rosbag play --clock [--rate=4] xxx.bag
+```
