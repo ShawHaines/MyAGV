@@ -113,10 +113,24 @@ class MappingBase(object):
                 np.delete(pointList,-1,axis=0)
             # origin bias
             pointList+=self.origin
+            pointList=self.inBound(pointList)
             # decrease possibility
             self.pmap[pointList[:,0],pointList[:,1]]=0
-            self.pmap[tuple(np.array(end)+self.origin)]=1
+            endPoint=self.inBound(np.array(end)+self.origin)
+            if np.size(endPoint)>0:
+                self.pmap[tuple(endPoint.reshape(-1))]=1
         return
+
+    def inBound(self,pointList):
+        '''
+        Performs boundary check so that the map bound won't be crossed.
+        receive pointList as an n*2 array. Returns its elements that are within the boundaries.
+        '''
+        pointList=np.reshape(pointList,(-1,2))
+        upperBound=np.array([self.xw,self.yw])
+        lowerBound=np.array([0,0])
+        validIndices=(np.all(pointList<upperBound,axis=1))&(np.all(pointList>=lowerBound,axis=1))
+        return pointList[validIndices,:]
 
     def line(self,start,end):
         """

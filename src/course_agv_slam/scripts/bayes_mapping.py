@@ -38,10 +38,13 @@ class Bayes_Mapping(MappingBase):
                 np.delete(pointList,-1,axis=0)
             # origin bias
             pointList+=self.origin
+            pointList=self.inBound(pointList)
             # transmitted, decrease possibility
             self.oddMap[pointList[:,0],pointList[:,1]]+=self.transmitOdd
             # reflected on obstacles.
-            self.oddMap[tuple(np.array(end)+self.origin)]+=self.reflectOdd
+            endPoint=self.inBound(np.array(end)+self.origin)
+            if np.size(endPoint)>0:
+                self.oddMap[tuple(endPoint.reshape(-1))]+=self.reflectOdd
         self.pmap=1.0-1.0/(1+np.exp(self.oddMap))
         return
 
