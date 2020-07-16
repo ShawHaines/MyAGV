@@ -74,15 +74,6 @@ class GlobalPlanner:
     path=None
 
     def __init__(self):
-        # TODO :
-        #   tf listener : 
-        #   publisher   : /course_agv/global_path
-        #   subscriber  : /course_agv/goal
-        #   service     : /course_agv/global_plan
-        #   initialize for other variable
-        
-        #example
-        
         self.pathPublisher = rospy.Publisher('/course_agv/global_path',Path,queue_size = 1)
         self.tfListener=tf.TransformListener() # plenty usage guides
         self.loadMap()
@@ -97,7 +88,7 @@ class GlobalPlanner:
         ExpandRadius=0.4
         rospy.wait_for_service('/static_map')        
         try:
-            # very compact use, equal to the effect of the commented ones.
+            # very compact usage, equal to the effect of the commented ones.
             data=rospy.ServiceProxy("/static_map",GetMap)().map
             # getMapHandle=rospy.ServiceProxy("/static_map",GetMap)
             # data=getMapHandle().map
@@ -231,7 +222,7 @@ class GlobalPlanner:
         self.currentPose = PoseStamped()
         
         # subtract a duration of 0.03 second to ensure the transform.
-        self.currentPose.header.__init__(seq=1,stamp=rospy.Time.now()-rospy.Duration(secs=0.03),frame_id="robot_base")
+        self.currentPose.header.__init__(seq=1,stamp=rospy.Time(0),frame_id="robot_base")
         self.currentPose.pose.position=Point(0,0,0)
         self.currentPose.pose.orientation=Quaternion(0,0,0,1)
         rospy.loginfo(self.currentPose)
