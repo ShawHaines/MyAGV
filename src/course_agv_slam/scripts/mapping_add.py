@@ -34,11 +34,13 @@ class Mapping(MappingBase):
                 np.delete(pointList,-1,axis=0)
             # origin bias
             pointList+=self.origin
+            pointList=self.inBound(pointList)
             # transmitted, decrease possibility
             self.pmap[pointList[:,0],pointList[:,1]]-=self.weight
             # reflected on obstacles.
-            self.pmap[tuple(np.array(end)+self.origin)]+=10*self.weight
-
+            endPoint=self.inBound(np.array(end)+self.origin)
+            if np.size(endPoint)>0:
+                self.pmap[tuple(endPoint.reshape(-1))]+=10*self.weight
         self.pmap[self.pmap>1]=1
         self.pmap[self.pmap<0]=0
         return

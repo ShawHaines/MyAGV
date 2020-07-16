@@ -11,7 +11,7 @@
     <!-- change it according to the frame you are using -->
     <param name="mapping/frame_name" value="slam_ekf"/>
 
-	<node pkg="course_agv_slam" type="mapping_add.py" name="mapping" output="screen"/>
+	<node pkg="course_agv_slam" type="bayes_mapping.py" name="mapping" output="screen"/>
 
     <!-- change it according to the localizing system you want to use. -->
     <include file="$(find course_agv_slam)/launch/slam.launch"/> 
