@@ -6,7 +6,7 @@
 Ubuntu 18.04 LTS or newer
 A graphics card is suggested when using laser rays. 
 
-The testings are passed on 
+The test cases are passed on 
 * Native Ubuntu 18.04LTS
 * Intel i5 8250U(4c8t) Processor
 * 8G RAM
@@ -90,7 +90,7 @@ rosbag play --clock [--rate=4] xxx.bag
 
 A series of light green arrows are added, representing the EKF localizing result; Green laser dots represent the simulated laser sensor.
 
-### EKF Based on Laser Landmarks
+### EKF Based on Landmarks
 ### 基于特征识别的扩展卡尔曼滤波定位
 
 ```bash
@@ -100,6 +100,17 @@ rosbag play --clock [--rate=4] xxx.bag
 ```
 
 Note that the script can't identify the landmarks properly when using 120 rays of laser.
+
+### EKF-SLAM(Simultaneously Localization and Mapping)
+### 扩展卡尔曼滤波 同时定位与地图构建
+
+```bash
+roslaunch course_agv_slam slam.launch
+# In another terminal
+rosbag play --clock [--rate=4] xxx.bag
+```
+
+Like EKF Based on Landmarks, the system cannot work properly under 120 rays of laser.
 
 ### Mapping
 ### 栅格地图构建
@@ -127,4 +138,3 @@ In addition, you can adjust your localizing node by changing the included launch
 | slam.launch            | EKF-SLAM 扩展卡曼滤波同时定位与地图构建 | slam_ekf             |
 | localization_lm.launch | EKF-Landmark 扩展卡曼滤波特征定位       | ekf_icp              |
 | localiztion.launch     | EKF 基于激光里程计的扩展卡曼滤波定位    | ekf_icp              |
-
